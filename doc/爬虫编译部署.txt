@@ -1,0 +1,38 @@
+mvn clean package -f parser_master.pom.xml
+...
+
+测试部署
+
+agentMaster
+
+vim agent_master.sh
+nohup java -jar /home/crawler/agent_master/core-1.0-SNAPSHOT-agent_master_exec.jar $@ > /home/crawler/agent_master/agent_master.log  2>&1 < /dev/null &
+echo $@
+~          
+
+vim run.sh
+sh /home/crawler/agent_master/agent_master.sh -i 192.168.1.202 -p 10000
+
+
+agentWorker
+
+ vim agent_worker.sh
+nohup java -jar /home/crawler/agent_worker/core-1.0-SNAPSHOT-agent_worker_exec.jar $@ > /home/crawler/agent_worker/agent_worker.log  2>&1 < /dev/null &
+echo $@
+~       
+
+sh /home/crawler/agent_worker/agent_worker.sh crawler://192.168.1.202:10000
+
+
+parserMaster
+ vim parser_master.sh
+
+nohup java -jar /home/crawler/parser_master/core-1.0-SNAPSHOT-parser_master_exec.jar $@ > /home/crawler/parser_master/parser_master.log  2>&1 < /dev/null &
+echo $@
+
+
+vim run.sh
+
+sh /home/crawler/parser_master/parser_master.sh -i 192.168.1.202 -p 12000
+
+参数可以通过--help取得

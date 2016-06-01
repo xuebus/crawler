@@ -1,0 +1,95 @@
+<docs table="dazhongdianping">
+    <!--你可以使用Jsoup内置的CSS SELECTOR、正则、json进行抽取，
+    我们会将其转换成语义树-->
+
+    <!--一个doc对应一个网页,url表示网页-->
+    <doc docid="dipingcity"
+         url="http://www.dianping.com/ajax/json/index/citylist/getCitylist?do=allCitylist&amp;_nr_force=1439875530364"
+         method="get" >
+
+        <list jsonselector="msg->html" name="result" notsave="true">
+            <text name="cityid" parameter="true" seprator="|" index="3" notsave="true"/>
+            <!-- jsonselector="cityid"  you can omit it ,default we choose name as jsonselector, also you can use regex el-->
+        </list>
+
+        <ref docid="dipingnavcity"/>
+    </doc>
+
+    <!--http://www.dianping.com/search/category/${cityid}/10#nav-tab|0|1 -->
+    <doc docid="dipingnavcity" url="http://www.dianping.com/search/category/1/10" method="get" firstdoc="true">
+        <list selector="div.nav-category.nav-tabs div.nc-contain div#J_nt_items div#region-nav a" name="result"
+              isfiled="false">
+            <attr attr="href" name="href" parameter="true" notsave="false" filterregex="([\w/]+)#" filterGroup="1"/>
+        </list>
+
+        <text selector="body#top div.section.Fix div.bread.J_bread span.num" name="total" filterRegex="(\d+)"
+              filterGroup="1"
+              notsave="false"/>
+
+        <!--<ref docid="dipingsubnavcity"/>-->
+    </doc>
+
+    <doc docid="dipingsubnavcity" url="http://www.dianping.com/search/category/1/10/r5937" method="get">
+        <list selector="div.nav-category.nav-tabs div.nc-contain div#J_nt_items div#region-nav-sub a" name="result">
+            <attr attr="href" name="href" parameter="true" notsave="true" filterregex="([\w/]+)#" filterGroup="1"/>
+        </list>
+        <text selector="body#top div.section.Fix div.bread.J_bread span.num" name="total" filterRegex="(\d+)"
+              filterGroup="1"
+              notsave="true"/>
+        <!-- if there is no total item number, you also can use totalpagesize-->
+
+        <ref docid="dipinglist"/>
+    </doc>
+
+    <doc docid="dipinglist" firsturl="http://www.dianping.com${href}"
+         url="http://www.dianping.com${href}/p${page}?aid=bf3133f6cf5079c59b8c8b315bcca026dc74ae45e529cc10368c3562c4b17f2715152b6bdfb29834f8e761cbec7f47c8cc713db7df194db5557cff3892124763190b89756f9e4156a7f2016980b11045&amp;tc=2"
+         method="get" page="true" maxPage="50" pagesize="15" firstpagesize="17">
+        <list selector="div.content-wrap div.shop-wrap div.content div.shop-list.J_shop-list.shop-all-list ul li"
+              name="result">
+            <attr selector="div.pic a" name="image" attr="href" index="0"/>
+            <!--index default 0 -->
+            <text selector="div.txt div.tit a h4" name="title"/>
+            <text selector="div.tag-addr a span" name="tag" index="0"/>
+            <text selector="div.tag-addr a span" name="address" index="1"/>
+            <!--default index=0 -->
+            <attr attr="href" selector="div.txt div.tit a" name="href" parameter="true" notsave="true"/>
+        </list>
+
+        <text selector="body#top div.section.Fix div.bread.J_bread span.num" name="total" filterRegex="(\d+)"
+              filterGroup="1"
+              notsave="true"/>
+        <ref docid="dipingdetail"/>
+    </doc>
+
+    <!--<doc docid="dipinglist" url="xx.com/${href}1?aid=bf3133f6cf5079c59b8c8b315bcca026dc74ae45e529cc10368c3562c4b17f2715152b6bdfb29834f8e761cbec7f47c8cc713db7df194db5557cff3892124763190b89756f9e4156a7f2016980b11045&tc=2"
+         url2="xx.com/${href}${page}?aid=bf3133f6cf5079c59b8c8b315bcca026dc74ae45e529cc10368c3562c4b17f2715152b6bdfb29834f8e761cbec7f47c8cc713db7df194db5557cff3892124763190b89756f9e4156a7f2016980b11045&tc=2"
+         method="get" page="true" pagesize="15" pagesize1="17">
+        <list selector="div.content-wrap div.shop-wrap div.content div.shop-list.J_shop-list.shop-all-list ul li"
+              name="result">
+            <attr selector="div.pic a" name="image" attr="abs:href" index="0"/>
+            &lt;!&ndash;index default 0 &ndash;&gt;
+            <text selector="div.txt div.tit a h4" name="title"/>
+            <text selector="div.tag-addr a span" name="tag" index="0"/>
+            <text selector="div.tag-addr a span" name="address" index="1"/>
+            &lt;!&ndash;default index=0 &ndash;&gt;
+            <attr attr="abs:href" name="href" parameter="true" notsave="true"/>
+        </list>
+        <ref docid="dipingdetail"/>
+    </doc>-->
+
+
+    <doc docid="dipingdetail" url="http://www.dianping.com${href}">
+        <text selector="div.body-content.clearfix div.main div#basic-info p.expand-info.tel span.item" name="tel"
+              type="multiple"
+              seprator="|"/>
+    </doc>
+
+    <!--post test-->
+    <!--<doc docid="dipingdetail" url="http://www.dianping.com/${href}">
+        <post>
+            <str name="a" value="haha" notsave="true"/>   [default notsave=false ]
+            <str name="title" notsave="true">${page}</str>
+        </post>
+    </doc>-->
+
+</docs>
