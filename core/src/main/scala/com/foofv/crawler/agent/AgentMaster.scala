@@ -177,7 +177,7 @@ private[crawler] class AgentMaster(
   private val fetchNextTaskIntervalCacheLoader: CacheLoader[java.lang.String, java.lang.Long] =
     new CacheLoader[java.lang.String, java.lang.Long]() {
       def load(key: java.lang.String): java.lang.Long = {
-        1000
+        1000L
       }
     }
   val fetchNextTaskIntervalCacheManager = CacheBuilder.newBuilder()
