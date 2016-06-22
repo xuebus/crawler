@@ -51,4 +51,7 @@ case class Res(workerId: String, var memUsage: Double, var cpuUsage: Double, var
   def getWeightTotalRes(): Double = {
     total
   }
+
+
 }
+

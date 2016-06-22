@@ -1,0 +1,7 @@
+target/
+core/target/
+.idea/
+.cache
+*.iml
+.class
+.log

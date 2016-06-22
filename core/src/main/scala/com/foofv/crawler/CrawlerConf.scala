@@ -111,7 +111,7 @@ class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Ser
     getOption(key).map(_.toBoolean).getOrElse(defaultValue)
   }
 
-  /** Get all akka conf variables set on this SparkConf */
+  /** Get all akka conf variables set on this CrawlerConf */
   def getAkkaConf: Seq[(String, String)] =
   /* This is currently undocumented. If we want to make this public we should consider
    * nesting options under the spark namespace to avoid conflicts with user akka options.
