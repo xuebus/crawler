@@ -28,7 +28,7 @@ class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Ser
 
   import CrawlerConf._
 
-  /** Create a SparkConf that loads defaults from system properties and the classpath */
+  /** Create a CrawlerConf that loads defaults from system properties and the classpath */
   def this() = this(true)
 
   private[crawler] val settings = new HashMap[String, String]()
@@ -114,11 +114,11 @@ class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Ser
   /** Get all akka conf variables set on this CrawlerConf */
   def getAkkaConf: Seq[(String, String)] =
   /* This is currently undocumented. If we want to make this public we should consider
-   * nesting options under the spark namespace to avoid conflicts with user akka options.
+   * nesting options under the crawler namespace to avoid conflicts with user akka options.
    * Otherwise users configuring their own akka code via system properties could mess up
-   * spark's akka options.
+   * crawler's akka options.
    *
-   *   E.g. spark.akka.option.x.y.x = "value"
+   *   E.g. crawler.akka.option.x.y.x = "value"
    */
     getAll.filter { case (k, _) => isAkkaConf(k) }
 
@@ -148,10 +148,7 @@ class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Ser
 }
 
 private[crawler] object CrawlerConf {
-  /**
-   * Return whether the given config is an akka config (e.g. akka.actor.provider).
-   * Note that this does not include spark-specific akka configs (e.g. spark.akka.timeout).
-   */
+
   def isAkkaConf(name: String): Boolean = name.startsWith("akka.")
 
 
