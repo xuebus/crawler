@@ -129,10 +129,15 @@ class MongoStorageManager private(conf: CrawlerConf) extends StorageManager {
 object MongoStorageManager extends App {
 
   var singleton: MongoStorageManager = null
+  val lock = new Object()
 
   def apply(conf: CrawlerConf): MongoStorageManager = {
     if (singleton == null) {
-      singleton = new MongoStorageManager(conf)
+      lock.synchronized{
+        if (singleton == null) {
+          singleton = new MongoStorageManager(conf)
+        }
+      }
     }
     singleton
   }

@@ -1,18 +1,18 @@
 /**
- * Copyright [2015] [soledede]
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+  * Copyright [2015] [soledede]
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+  * you may not use this file except in compliance with the License.
+  * You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
 package com.foofv.crawler.redis.cli
 
 import com.foofv.crawler.util.constant.Constant
@@ -30,9 +30,14 @@ import com.foofv.crawler.util.Logging
 
 private[crawler] class RedisOpsAkkaImpl private(conf: CrawlerConf) extends RedisOps with Logging {
 
-  implicit val akkaSystem = akka.actor.ActorSystem()
-  //val redis = RedisClient(conf.get("crawler.redis.ip", "192.168.1.203"))
-  val redis = RedisClient(port = conf.getInt("crawler.redis.port", 6379), host = conf.get("crawler.redis.ip", Constant(conf).REDIS_SERVER_IP))
+  var redis: RedisClient = _
+
+  if (!conf.getBoolean("local", false)) {
+    implicit val akkaSystem = akka.actor.ActorSystem()
+    //val redis = RedisClient(conf.get("crawler.redis.ip", "192.168.1.203"))
+    redis = RedisClient(port = conf.getInt("crawler.redis.port", 6379), host = conf.get("crawler.redis.ip", Constant(conf).REDIS_SERVER_IP))
+  }
+
 
   override def putToSortedSet[T: ByteStringSerializer](name: String, value: T, score: Double): Boolean = {
     this.synchronized {
@@ -58,11 +63,11 @@ private[crawler] class RedisOpsAkkaImpl private(conf: CrawlerConf) extends Redis
       val r = for {
         getOpt <- redis.zrangeWithscores[T](name, 0, 0)
       } yield {
-          getOpt.map(obj => {
-            rsObj = obj._1
-            scores = obj._2
-          })
-        }
+        getOpt.map(obj => {
+          rsObj = obj._1
+          scores = obj._2
+        })
+      }
       Await.result(r, 10 seconds)
     } catch {
       case e: Exception => logError("get first data from redis sortedset failed！", e)
@@ -79,11 +84,11 @@ private[crawler] class RedisOpsAkkaImpl private(conf: CrawlerConf) extends Redis
       val r = for {
         getOpt <- redis.zrangeWithscores[T](name, -1, -1)
       } yield {
-          getOpt.map(obj => {
-            rsObj = obj._1
-            scores = obj._2
-          })
-        }
+        getOpt.map(obj => {
+          rsObj = obj._1
+          scores = obj._2
+        })
+      }
       Await.result(r, 10 seconds)
     } catch {
       case e: Exception => logError("get last data from redis sortedset failed！" + e.getMessage())
@@ -142,10 +147,10 @@ private[crawler] class RedisOpsAkkaImpl private(conf: CrawlerConf) extends Redis
       val r = for {
         getOpt <- redis.lpop[T](key)
       } yield {
-          getOpt.map(getObj => {
-            rsObj = getObj
-          })
-        }
+        getOpt.map(getObj => {
+          rsObj = getObj
+        })
+      }
       Await.result(r, 10 seconds)
     } catch {
       case e: Exception => logError("get first data from redis list failed！" + e.getMessage())
@@ -161,10 +166,10 @@ private[crawler] class RedisOpsAkkaImpl private(conf: CrawlerConf) extends Redis
       val r = for {
         getOpt <- redis.rpop[T](key)
       } yield {
-          getOpt.map(getObj => {
-            rsObj = getObj
-          })
-        }
+        getOpt.map(getObj => {
+          rsObj = getObj
+        })
+      }
       Await.result(r, 10 seconds)
     } catch {
       case e: Exception => logError("get last data from redis list failed！" + e.getMessage())

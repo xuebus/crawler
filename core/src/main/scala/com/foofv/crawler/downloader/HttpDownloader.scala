@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import java.net.URL
 import java.net.URLConnection
 import java.util.concurrent.TimeUnit
+
 import com.foofv.crawler.util.listener.{JobTaskFailed, ManagerListenerWaiter}
 
 import scala.collection.mutable.HashMap
@@ -18,6 +19,7 @@ import com.foofv.crawler.agent.AgentWorker
 import com.foofv.crawler.antispamming.AntiSpamming
 import com.foofv.crawler.antispamming.IAntiSpammingFactory
 import com.foofv.crawler.antispamming.RedisAntiSpamming
+import com.foofv.crawler.downloader.stream.{TaskStreamProcess, TaskStreamProcessFactory}
 import com.foofv.crawler.entity.CrawlerTaskEntity
 import com.foofv.crawler.entity.ResObj
 import com.foofv.crawler.enumeration.CrawlerTaskType
@@ -32,13 +34,14 @@ import com.foofv.crawler.util.Logging
 import com.foofv.crawler.util.constant.Constant
 import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
+
 import scala.actors.threadpool.AtomicInteger
 
 /**
- * @author soledede
- */
+  * @author soledede
+  */
 private[crawler] class HttpDownloader private(conf: CrawlerConf) extends Downloader with ITaskQueueFactory
-with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IAntiSpammingFactory with Logging with LogOper {
+  with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IAntiSpammingFactory with TaskStreamProcessFactory with Logging with LogOper {
 
   val w = ManagerListenerWaiter()
 
@@ -73,7 +76,13 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
   // persist ResObj to Storage by key
   // if success, send key to Kafka
   override def persist(resObj: ResObj): Boolean = {
-    var success = false
+    if (!conf.getBoolean("local", false)) {
+      createTaskStreamProcess().persist(resObj)
+    } else {
+      createLocalTaskStreamProcess().persist(resObj)
+    }
+
+    /*var success = false
     val taskEntity: CrawlerTaskEntity = resObj.tastEntity
     try {
       val storageManager = createStorageManager()
@@ -104,7 +113,7 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
         AgentWorker.putFailedTaskBacktoSortedSet(taskEntity)
       }
     }
-    success
+    success*/
   }
 
   //send key to Kafka
@@ -120,6 +129,7 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
   // callback of CloseableHttpAsyncClient.execute
   // when Http request completed, invoked to handle HTTP response and do something else
   var callbackCounter = new AtomicInteger
+
   def callback(context: HttpClientContext, httpResp: org.apache.http.HttpResponse): Unit = {
 
     val taskEntity = HttpDownloader.getTaskEntityFromHttpClientContext(context)
@@ -144,13 +154,14 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
 
       if (statusCode == 404) {
         logTimes(taskId, domain, ip, startTime, endTime, costTime, statusCode)
-        w.post(JobTaskFailed(taskEntity.jobId.toString,taskEntity.jobName,1))
+        w.post(JobTaskFailed(taskEntity.jobId.toString, taskEntity.jobName, 1))
       } else if (statusCode != 200) {
         // if  HTTP StatusCode != 200, HTTP request failed, update refusedState
         var refusedState = false
         var putTaskEntityBacktoRedisSortedSet = true
         val entity = httpResp.getEntity
         var respContent = EntityUtils.toString(entity)
+
         if (statusCode == 302) {
           val taskId = taskEntity.taskId
           val taskUrl = taskEntity.taskURI
@@ -160,19 +171,27 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
             refusedState = false
             putTaskEntityBacktoRedisSortedSet = false
             logInfo(s"taskId[$taskId] taskUrl[$taskUrl] invalid")
-            w.post(JobTaskFailed(taskEntity.jobId.toString,taskEntity.jobName,1))
+            w.post(JobTaskFailed(taskEntity.jobId.toString, taskEntity.jobName, 1))
           } else {
             respContent = handleHttpStatusCode302(taskEntity, httpResp)
-            // Http response content may contain infomation about forbidden
-            if (redis.isRefusedMoudle(taskId, domain, ip, costTime, statusCode, refusedState, respContent)) {
-              // update and get refusedCount
-              val refusedCount = HttpDownloader.updateRefuseCountHashMap(domain)
-              if (refusedCount >= HttpDownloader.refusedCountMax) {
-                //if forbidden
-                refusedState = true
-                requestCoutForbidden(taskEntity, domain, true) //request count in some interval
+
+            //local,don't process  for forbidden
+            if (!conf.getBoolean("local", false))
+              forbiddenProcess
+
+            def forbiddenProcess: AnyVal = {
+              // Http response content may contain infomation about forbidden
+              if (redis.isRefusedMoudle(taskId, domain, ip, costTime, statusCode, refusedState, respContent)) {
+                // update and get refusedCount
+                val refusedCount = HttpDownloader.updateRefuseCountHashMap(domain)
+                if (refusedCount >= HttpDownloader.refusedCountMax) {
+                  //if forbidden
+                  refusedState = true
+                  requestCoutForbidden(taskEntity, domain, true) //request count in some interval
+                }
               }
             }
+
           }
         } else if (taskEntity.forbiddenCode != null && !taskEntity.forbiddenCode.equalsIgnoreCase("null")) {
           if (taskEntity.forbiddenCode.toInt == statusCode) {
@@ -180,7 +199,9 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
             if (refusedCount >= HttpDownloader.refusedCountMax) {
               //if forbidden
               refusedState = true
-              requestCoutForbidden(taskEntity, domain, true) //request count in some interval
+              //local,don't process  for forbidden
+              if (!conf.getBoolean("local", false))
+                requestCoutForbidden(taskEntity, domain, true) //request count in some interval
             }
           }
         } else {
@@ -188,18 +209,25 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
           respContent = EntityUtils.toString(entity)
         }
 
-        if (putTaskEntityBacktoRedisSortedSet) {
-          AgentWorker.putFailedTaskBacktoSortedSet(taskEntity)
-        }
+        if (!conf.getBoolean("local", false))
+          if (putTaskEntityBacktoRedisSortedSet) {
+            AgentWorker.putFailedTaskBacktoSortedSet(taskEntity)
+          }
         logTimes(taskId, domain, ip, startTime, endTime, costTime, statusCode, refusedState, content = respContent)
       } else {
         //HTTP request success, get response content and persist ResObj
         logTimes(taskId, domain, ip, startTime, endTime, costTime, statusCode)
         HttpDownloader.resetRefuseCount(domain)
+
+
         handleHttpResponse(httpResp, taskEntity)
-        requestCoutForbidden(taskEntity, domain, false)
-        //if request count approach the requestCount in redis, then put the taskEntity into sortsetTask queue ,moreover you need set the interval for some threshold
-        predictForbidden(domain, taskEntity)
+
+
+        if (!conf.getBoolean("local", false)) {
+          requestCoutForbidden(taskEntity, domain, false)
+          //if request count approach the requestCount in redis, then put the taskEntity into sortsetTask queue ,moreover you need set the interval for some threshold
+          predictForbidden(domain, taskEntity)
+        }
       }
     }
   }
@@ -424,6 +452,16 @@ with RequestFactory with StorageManagerFactory with IMessageQueueFactory with IA
     Request("httpClient", conf)
   }
 
+
+  override def createTaskStreamProcess(): TaskStreamProcess = {
+    TaskStreamProcess(conf, "kv")
+  }
+
+
+  override def createLocalTaskStreamProcess(): TaskStreamProcess = {
+    TaskStreamProcess(conf, "local")
+  }
+
   override def createStorageManager(): StorageManager = {
     StorageManager("oss", conf)
   }
@@ -485,6 +523,7 @@ object HttpDownloader extends Logging {
 
   //cache key[taskId]->Value[CrawlerTaskEntity]
   import scala.collection.JavaConversions._
+
   val TaskEntityHashMap = java.util.Collections.synchronizedMap(new scala.collection.mutable.HashMap[String, CrawlerTaskEntity])
 
   def getTaskEntityFromHttpClientContext(context: HttpClientContext): CrawlerTaskEntity = {

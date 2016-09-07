@@ -54,6 +54,7 @@ object StorageManager {
       case "hbase" => HbaseStorageManager(conf)
       case "mongo" => MongoStorageManager(conf)
       case "oss" => OSSStorageManager(conf)
+      case "local"=> LocalStorageManager(conf)
       case _       => null
     }
   }

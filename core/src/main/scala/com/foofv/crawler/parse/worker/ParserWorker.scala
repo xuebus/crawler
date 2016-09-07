@@ -26,25 +26,28 @@ import com.foofv.crawler.agent.CrawlerDTWorker
 import com.foofv.crawler.blockqueue.CrawlerBlockQueue
 import com.foofv.crawler.parse.Parser
 import com.foofv.crawler.parse.ParserPersistRunner
+
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.Await
 import java.net.SocketTimeoutException
+import java.util.concurrent.ThreadPoolExecutor
 
 /**
- * do work
- * @author soledede
- */
+  * do work
+  *
+  * @author soledede
+  */
 private[crawler] class ParserWorker(
-  override val host: String,
-  override val port: Int,
-  override val cores: Int,
-  override val memory: Int,
-  override val masterUrls: Array[String],
-  override val actorSystemName: String,
-  override val actorName: String,
-  override val conf: CrawlerConf,
-  override val controlUrl: String) extends Worker(host, port, cores, memory, masterUrls, actorSystemName, actorName, conf, controlUrl) with Logging with StorageManagerFactory {
+                                     override val host: String,
+                                     override val port: Int,
+                                     override val cores: Int,
+                                     override val memory: Int,
+                                     override val masterUrls: Array[String],
+                                     override val actorSystemName: String,
+                                     override val actorName: String,
+                                     override val conf: CrawlerConf,
+                                     override val controlUrl: String) extends Worker(host, port, cores, memory, masterUrls, actorSystemName, actorName, conf, controlUrl) with Logging with StorageManagerFactory {
 
   var storageManager: StorageManager = createStorageManager
   var parserThreadPool = Util.newDaemonFixedThreadPool(conf.getInt("crawler.parser.worker.threadnum", Util.inferCores() * conf.getInt("cralwer.parser.worker.core.thread", 2)), "parser_thread_excutor")
@@ -55,6 +58,7 @@ private[crawler] class ParserWorker(
 
   var parserAndPersistObjDTTask: CrawlerDTWorker = null
   var parserAndPersistObjDTMonitor: CrawlerDTWorker = null
+
   override def intiWorker() = {
     implicit val timeout = akka.util.Timeout.apply(5, java.util.concurrent.TimeUnit.SECONDS)
     val controlSelect = context.actorSelection(CrawlerControlManager.toAkkaUrl(controlUrl)).resolveOne()
@@ -149,17 +153,17 @@ private[crawler] class ParserWorker(
     logInfo("rowKeyFailedTmpCache.size" + rowKeyFailedTmpCache.size())
     if (rowKeyFailedTmpCache.size() > 0) {
       rowKeyFailedTmpCache.toArray().foreach {
-        x =>
-          {
-            rowKeyFailedTmpCache.remove(x.asInstanceOf[String])
-            val ro = resResObj(x.asInstanceOf[String])
-            if (ro != null) {
-              parserThreadPool.submit(new ParserRunner(resObj, conf))
-            }
+        x => {
+          rowKeyFailedTmpCache.remove(x.asInstanceOf[String])
+          val ro = resResObj(x.asInstanceOf[String])
+          if (ro != null) {
+            parserThreadPool.submit(new ParserRunner(resObj, conf))
           }
+        }
       }
     }
   }
+
 
   private def resResObj(rowkey: String) = {
     var resObj: ResObj = null
@@ -208,9 +212,12 @@ private[crawler] class ParserWorker(
   }
 }
 
-private[crawler] object ParserWorker {
+private[crawler] object ParserWorker extends Logging {
+  var parserThreadPool: ThreadPoolExecutor = null
+  var asynPersistThreadPool: ThreadPoolExecutor = null
 
   def main(argStrings: Array[String]): Unit = {
+
 
     val conf = new CrawlerConf
     val args = new WorkerArguments(argStrings, conf)
@@ -224,13 +231,13 @@ private[crawler] object ParserWorker {
   }
 
   def startSystemAndActor(
-    host: String,
-    port: Int,
-    cores: Int,
-    memory: Int,
-    masterUrls: Array[String],
-    controlUrl: String,
-    workerNumber: Option[Int] = None): (ActorSystem, Int) = {
+                           host: String,
+                           port: Int,
+                           cores: Int,
+                           memory: Int,
+                           masterUrls: Array[String],
+                           controlUrl: String,
+                           workerNumber: Option[Int] = None): (ActorSystem, Int) = {
 
     val conf = new CrawlerConf
     val systemName = "parserWorkerSys" + workerNumber.map(_.toString).getOrElse("")
@@ -239,6 +246,33 @@ private[crawler] object ParserWorker {
     actorSystem.actorOf(Props(classOf[ParserWorker], host, boundPort, cores, memory,
       masterUrls, systemName, actorName, conf, controlUrl), name = actorName)
     (actorSystem, boundPort)
+  }
+
+  def handleMsgLocal(resObj: ResObj, conf: CrawlerConf) = {
+    if (parserThreadPool == null) {
+      parserThreadPool = Util.newDaemonFixedThreadPool(conf.getInt("crawler.parser.worker.threadnum", Util.inferCores() * conf.getInt("cralwer.parser.worker.core.thread", 2)), "parser_thread_excutor")
+    }
+    if (resObj != null) {
+      parserThreadPool.submit(new ParserRunner(resObj, conf))
+      logInfo(s"receive resObj for parse thread pool by local,resObj:${resObj.toString}")
+    }
+
+  }
+
+  //process the entity that have been parsed
+  def parserAndPersistObj(conf: CrawlerConf) = {
+    while (true) {
+      val paserResObj = conf.dataEntityPersistLocal.parserAndObjAsynCacheQueue.take()
+      if (paserResObj != null)
+        submitPaserResObjThreadPool(paserResObj._1, paserResObj._2, paserResObj._3, conf)
+    }
+  }
+
+  def submitPaserResObjThreadPool(parser: Parser, resObj: ResObj, obj: AnyRef, conf: CrawlerConf) = {
+    if (asynPersistThreadPool == null)
+      asynPersistThreadPool = Util.newDaemonFixedThreadPool(conf.getInt("crawler.parser.worker.threadnum", Util.inferCores() * conf.getInt("cralwer.parser.worker.core.thread", 2)), "asynPersist_thread_excutor")
+    if (parser != null && resObj != null)
+      asynPersistThreadPool.submit(new ParserPersistRunner(parser, resObj, obj, conf))
   }
 
 }

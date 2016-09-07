@@ -1,18 +1,18 @@
 /**
- * Copyright [2015] [soledede]
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+  * Copyright [2015] [soledede]
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+  * you may not use this file except in compliance with the License.
+  * You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
 package com.foofv.crawler.parse
 
 import com.foofv.crawler.storage.StorageManager
@@ -33,8 +33,8 @@ import com.foofv.crawler.util.constant.Constant
 import com.foofv.crawler.util.listener.{JobTaskCompleted, JobTaskAdded, ManagerListenerWaiter}
 
 /**
- * @author soledede
- */
+  * @author soledede
+  */
 private[crawler] class ParserManager private(conf: CrawlerConf) extends Logging with ParserFactory with ITaskFilterFactory with URLAssemblerFactory with URLDistinctManagerFactory with ITaskQueueFactory {
 
   //var analyzer: Analyzer = createAnalyzer()
@@ -170,7 +170,8 @@ private[crawler] class ParserManager private(conf: CrawlerConf) extends Logging 
           taskId = newTask.taskId
           newTask.currentBatchId = taskEntity.currentBatchId + 1
           taskBatchId = newTask.currentBatchId
-          taskQueue.putElementToSortedSet(taskSortedSetName, newTask, System.currentTimeMillis() + newTask.intervalTime * 60000)
+          //taskQueue.putElementToSortedSet(taskSortedSetName, newTask, System.currentTimeMillis() + newTask.intervalTime * 60000)
+          conf.taskManager.submitTask(newTask, newTask.intervalTime * 60000)
           logInfo(s"task id[$taskId] depth[$taskDepth] batchId[$taskBatchId] totalBatch[$totalBatch] back to SortedSet and next batch start.")
         } else {
           logInfo(s"task id[$taskId] depth[$taskDepth]  batchId[$taskBatchId] totalBatch[$totalBatch] need not to back SortedSet.")
@@ -188,20 +189,21 @@ private[crawler] class ParserManager private(conf: CrawlerConf) extends Logging 
     var commitTaskEntitySeq = taskEntityList.filter { taskEntity =>
       var flag: Boolean = false
       var commit: Boolean = false
-      
-      try{
-      taskEntity.taskURI = taskEntity.taskURI.replaceAll("\\|", "%7c")
-      } 
+
+      try {
+        taskEntity.taskURI = taskEntity.taskURI.replaceAll("\\|", "%7c")
+      }
       catch {
-            case e: Exception => println("parent task:"+resObj.tastEntity.taskURI+"\n"+taskEntity.taskURI)
-          }
+        case e: Exception => println("parent task:" + resObj.tastEntity.taskURI + "\n" + taskEntity.taskURI)
+      }
       if (taskEntity.taskURI.trim.equalsIgnoreCase(resObj.tastEntity.taskURI.trim)) flag = true
       if (!flag) {
         if (counter % childTaskSubmitBatchSize == 0) {
           batch += 1
         }
         val offset = childTaskSubmitInterval * batch + random.nextInt(childTaskScoreMaxLimit * 1000) + 1
-        val t = taskQueue.putElementToSortedSet(taskSortedSetName, taskEntity, System.currentTimeMillis() + offset)
+        //val t = taskQueue.putElementToSortedSet(taskSortedSetName, taskEntity, System.currentTimeMillis() + offset)
+        val t = conf.taskManager.submitTask(taskEntity, System.currentTimeMillis() + offset)
         val taskId = taskEntity.taskId
         val taskUrl = taskEntity.taskURI
         logInfo(s"task[$taskId] url[$taskUrl] offset [$offset]")
@@ -293,8 +295,8 @@ object TestParserManager {
   def main(args: Array[String]): Unit = {
     testSchedule
   }
-  
-  def testSchedule ={
+
+  def testSchedule = {
     val conf = new CrawlerConf
     val taskEntityList = Seq(testTaskEntity, testTaskEntity, testTaskEntity, testTaskEntity)
     val parserManager = ParserManager(conf)

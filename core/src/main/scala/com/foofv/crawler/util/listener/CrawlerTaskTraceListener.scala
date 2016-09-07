@@ -9,37 +9,51 @@ import scala.collection.immutable.HashSet
 import scala.collection.mutable
 
 /**
- * Created by soledede on 2015/9/17.
- */
+  * Created by soledede on 2015/9/17.
+  */
 class CrawlerTaskTraceListener(conf: CrawlerConf) extends TraceListener {
+  var redisOps: RedisOps = _
 
-  val redisOps = RedisOps("akka", conf)
+  val isLocal = conf.getBoolean("local", false)
+  if (!isLocal)
+    redisOps = RedisOps("akka", conf)
 
 
   override def onJobStart(jobstart: JobStarted): Unit = {
-    redisOps.setValue(CrawlerTaskTraceListener.task_all_task_preffix + jobstart.jobId + CrawlerTaskTraceListener.separator + jobstart.jobName + CrawlerTaskTraceListener.task_suffix, jobstart.seedNum)
+    if (!isLocal)
+      redisOps.setValue(CrawlerTaskTraceListener.task_all_task_preffix + jobstart.jobId + CrawlerTaskTraceListener.separator + jobstart.jobName + CrawlerTaskTraceListener.task_suffix, jobstart.seedNum)
   }
 
   override def onJobTaskFailed(jobTaskFailed: JobTaskFailed): Int = {
-    redisOps.incrBy(CrawlerTaskTraceListener.task_failed_preffix + jobTaskFailed.jobId + CrawlerTaskTraceListener.separator + jobTaskFailed.jobName + CrawlerTaskTraceListener.task_suffix, jobTaskFailed.num)
+    if (!isLocal)
+      redisOps.incrBy(CrawlerTaskTraceListener.task_failed_preffix + jobTaskFailed.jobId + CrawlerTaskTraceListener.separator + jobTaskFailed.jobName + CrawlerTaskTraceListener.task_suffix, jobTaskFailed.num)
+    else -1
   }
 
   override def onJobTaskCompleted(jobTaskCompleted: JobTaskCompleted): Int = {
-    redisOps.incrBy(CrawlerTaskTraceListener.task_completed_preffix + jobTaskCompleted.jobId + CrawlerTaskTraceListener.separator + jobTaskCompleted.jobName + CrawlerTaskTraceListener.task_suffix, jobTaskCompleted.num)
+    if (!isLocal)
+      redisOps.incrBy(CrawlerTaskTraceListener.task_completed_preffix + jobTaskCompleted.jobId + CrawlerTaskTraceListener.separator + jobTaskCompleted.jobName + CrawlerTaskTraceListener.task_suffix, jobTaskCompleted.num)
+    else -1
   }
 
   override def onJobTaskAdded(jobTaskAdded: JobTaskAdded): Int = {
-    redisOps.incrBy(CrawlerTaskTraceListener.task_all_task_preffix + jobTaskAdded.jobId + CrawlerTaskTraceListener.separator + jobTaskAdded.jobName + CrawlerTaskTraceListener.task_suffix, jobTaskAdded.num)
+    if (!isLocal)
+      redisOps.incrBy(CrawlerTaskTraceListener.task_all_task_preffix + jobTaskAdded.jobId + CrawlerTaskTraceListener.separator + jobTaskAdded.jobName + CrawlerTaskTraceListener.task_suffix, jobTaskAdded.num)
+    else -1
   }
 
   override def onSearch(keys: Keys): Option[Seq[String]] = {
-    val allKey = redisOps.keys(keys.parttern)
-    allKey match {
-      case Some(k) =>
-        k.foreach(cacheControlWebPage(_))
-      case None => logInfo("no value can get,connect redis maybe timeout!")
-    }
-    allKey
+
+    if (!isLocal) {
+      val allKey = redisOps.keys(keys.parttern)
+      allKey match {
+        case Some(k) =>
+          k.foreach(cacheControlWebPage(_))
+        case None => logInfo("no value can get,connect redis maybe timeout!")
+      }
+      allKey
+    } else null
+
   }
 
   def cacheControlWebPage(k: String) = {

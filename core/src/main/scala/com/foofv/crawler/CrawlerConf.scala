@@ -1,37 +1,67 @@
-/**
- * Copyright [2015] [soledede]
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- **/
-
 package com.foofv.crawler
+
+import com.foofv.crawler.conf.impl.DefaultConfiguration
+import com.foofv.crawler.downloader.Downloader
+import com.foofv.crawler.local.{DataEntityPersistLocal, FetchLocal, ParseProcessLocal}
+import com.foofv.crawler.schedule.{ITaskQueue, TaskManager}
+import com.foofv.crawler.schedule.manager.{LoacalTaskManager, RedisTaskManager}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{HashMap, LinkedHashSet}
 import com.foofv.crawler.util.Logging
 
 /**
- * @author:soledede
- * @email:wengbenjue@163.com
- */
-class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Serializable {
-
+  * @author:soledede
+  * @email:wengbenjue@163.com
+  */
+private[crawler] class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Serializable with DefaultConfiguration {
+  private[crawler] val settings = new HashMap[String, String]()
   import CrawlerConf._
 
   /** Create a CrawlerConf that loads defaults from system properties and the classpath */
   def this() = this(true)
 
-  private[crawler] val settings = new HashMap[String, String]()
+
+  var taskManager: TaskManager = _
+  var taskQueue: ITaskQueue = _
+  var redis: ITaskQueue = _
+
+
+  //local
+  var fetchLocal: FetchLocal = _
+  var parseProcess: ParseProcessLocal = _
+  var dataEntityPersistLocal: DataEntityPersistLocal = _
+
+  init()
+
+  def init() = {
+    //submit task to queue for local cache
+    if (local) {
+      this.set("local", "true")
+      this.taskManager = new LoacalTaskManager(this)
+
+      //get entity from queue and start fetch url
+      this.fetchLocal = new FetchLocal(this)
+
+      //parser for local
+      this.parseProcess = new ParseProcessLocal(this)
+
+      //save data  local
+      this.dataEntityPersistLocal = new DataEntityPersistLocal(this)
+
+    } else {
+      this.set("local", "false")
+      //submit task to queue for distribute env
+      this.taskManager = new RedisTaskManager(this)
+    }
+
+    this.taskQueue = ITaskQueue("sortSet", this)
+    this.redis = ITaskQueue("list", this)
+
+
+  }
+
+
 
   if (loadDefaults) {
     // Load any crawler.* system properties
@@ -132,16 +162,16 @@ class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Ser
   }
 
   /**
-   * By using this instead of System.getenv(), environment variables can be mocked
-   * in unit tests.
-   */
+    * By using this instead of System.getenv(), environment variables can be mocked
+    * in unit tests.
+    */
   private[crawler] def getenv(name: String): String = System.getenv(name)
 
 
   /**
-   * Return a string listing all keys and values, one per line. This is useful to print the
-   * configuration out for debugging.
-   */
+    * Return a string listing all keys and values, one per line. This is useful to print the
+    * configuration out for debugging.
+    */
   def toDebugString: String = {
     settings.toArray.sorted.map { case (k, v) => k + "=" + v }.mkString("\n")
   }

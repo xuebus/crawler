@@ -18,7 +18,7 @@ import org.apache.commons.lang3.StringUtils
 import org.codehaus.jackson.JsonNode
 import org.codehaus.jackson.map.ObjectMapper
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{Map,HashMap}
+import scala.collection.mutable.{Map, HashMap}
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks._
 import com.foofv.crawler.util.constant.Constant
@@ -29,8 +29,10 @@ import scala.collection.mutable.Map
 
 private[crawler] class CrawlerControlImpl private(conf: CrawlerConf) extends CrawlerControl with Logging {
 
-  private val taskQueue: ITaskQueue = ITaskQueue("sortSet", conf)
-  private val redis: ITaskQueue = ITaskQueue("list", conf)
+  /*private val taskQueue: ITaskQueue = ITaskQueue("sortSet", conf)
+  private val redis: ITaskQueue = ITaskQueue("list", conf)*/
+  private val taskQueue: ITaskQueue = conf.taskQueue
+  private val redis: ITaskQueue = conf.redis
   private val userAgentSetName: String = conf.get("crawler.control.userAgent.set.name", "user-agent-set")
   private val sqlHelp = SQLParser("mongo", conf)
   val w = ManagerListenerWaiter()
@@ -379,7 +381,8 @@ private[crawler] class CrawlerControlImpl private(conf: CrawlerConf) extends Cra
 
   //submit the task to queue for schedule
   def submitTask(task: CrawlerTaskEntity): Boolean = {
-    val f = taskQueue.putElementToSortedSet(Constant(conf).CRAWLER_TASK_SORTEDSET_KEY, task, task.taskStartTime)
+    //val f = taskQueue.putElementToSortedSet(Constant(conf).CRAWLER_TASK_SORTEDSET_KEY, task, task.taskStartTime)
+    val f = conf.taskManager.submitTask(task,task.taskStartTime)
     logInfo("submitTask " + task.toString)
     f
   }

@@ -69,6 +69,8 @@ private[crawler] class CrawlerTaskEntity(
     ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE)
   }
 
+
+
   def allCloneSelf(): CrawlerTaskEntity = {
     val task = new CrawlerTaskEntity
     task.parentTaskId = this.parentTaskId
@@ -178,6 +180,19 @@ private[crawler] class CrawlerTaskEntity(
     task
   }
 
+  def canEqual(other: Any): Boolean = other.isInstanceOf[CrawlerTaskEntity]
+
+  override def equals(other: Any): Boolean = other match {
+    case that: CrawlerTaskEntity =>
+      (that canEqual this) &&
+        taskId == that.taskId
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    val state = Seq(taskId)
+    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+  }
 }
 
 object CrawlerTaskEntity {
@@ -286,5 +301,6 @@ object CrawlerTaskEntity {
   val taskCounter = new AtomicInteger(1)
 
   def geneTaskId = java.util.UUID.randomUUID().toString() + "#" + taskCounter.getAndIncrement
+
 
 }

@@ -5,9 +5,11 @@ import java.text.SimpleDateFormat
 import java.util
 import java.util.Date
 import java.util.concurrent.TimeUnit
+
 import akka.actor.ActorRef
 import akka.pattern._
 import com.foofv.crawler.CrawlerConf
+import com.foofv.crawler.control.CrawlerControlImpl
 import com.foofv.crawler.deploy.TransferMsg.{DocTrees, JobId}
 import com.foofv.crawler.entity.{CrawlerTaskEntity, ResObj}
 import com.foofv.crawler.enumeration.HttpRequestMethodType
@@ -19,18 +21,19 @@ import com.foofv.crawler.util.constant.Constant
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import org.apache.http.message.BasicNameValuePair
 import org.codehaus.jackson.map.ObjectMapper
+
 import scala.collection.JavaConverters._
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{Map, ListBuffer, HashMap}
-import scala.collection.{mutable}
+import scala.collection.mutable.{HashMap, ListBuffer, Map}
+import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.control.Breaks._
 import com.foofv.crawler.parse.scheme.ResultParameter
 
 /**
- * Created by soledede on 2015/8/20.
- */
+  * Created by soledede on 2015/8/20.
+  */
 private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser {
 
   override def parse(resObj: ResObj, obj: AnyRef): AnyRef = {
@@ -56,7 +59,7 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
     if (isStream == 1 && content != null && content.length > 0) {
       var taleName = resObj.tastEntity.tableName
       if (taleName == null || taleName.isEmpty) taleName = "sys_soledede"
-      return (taleName, Map("taskUrl"->resObj.tastEntity.taskURI,  "content" -> content))
+      return (taleName, Map("taskUrl" -> resObj.tastEntity.taskURI, "content" -> content))
     }
     obj
   }
@@ -69,20 +72,24 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
       val jobId = resObj.tastEntity.jobId.toString
       var docMap = SchemeTopicParser.schemeDocCacheManager.getIfPresent(jobId)
       if (docMap == null) {
-        if (SchemeTopicParser.controlActor != null) {
-          implicit val timeout = akka.util.Timeout.apply(50, java.util.concurrent.TimeUnit.SECONDS)
-          val future = SchemeTopicParser.controlActor ? JobId(jobId)
-          var r: DocTrees = null
-          r = Await.result(future, 50 seconds).asInstanceOf[DocTrees]
-          if (future.isCompleted) {
-            SchemeTopicParser.schemeDocCacheManager.put(jobId, r.tree)
-            docMap = r.tree
-          } else {
-            logInfo("can't get receive message in 50 seconds!")
-          }
-          //Thread.sleep(5000)
+        if (conf.getBoolean("local", false)) {
+          SchemeTopicParser.schemeDocCacheManager.put(jobId, CrawlerControlImpl.semanticTreeMap(jobId))
         } else {
-          logError("can't connect controlActor..")
+          if (SchemeTopicParser.controlActor != null) {
+            implicit val timeout = akka.util.Timeout.apply(50, java.util.concurrent.TimeUnit.SECONDS)
+            val future = SchemeTopicParser.controlActor ? JobId(jobId)
+            var r: DocTrees = null
+            r = Await.result(future, 50 seconds).asInstanceOf[DocTrees]
+            if (future.isCompleted) {
+              SchemeTopicParser.schemeDocCacheManager.put(jobId, r.tree)
+              docMap = r.tree
+            } else {
+              logInfo("can't get receive message in 50 seconds!")
+            }
+            //Thread.sleep(5000)
+          } else {
+            logError("can't connect controlActor..")
+          }
         }
       }
       if (docMap != null) {
@@ -188,23 +195,23 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
 
       if (execTree != null) {
         try {
-          val item = execTree.asInstanceOf[(mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], mutable.Map[String, AnyRef],ResultParameter)]
+          val item = execTree.asInstanceOf[(mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], mutable.Map[String, AnyRef], ResultParameter)]
           obj = item._1
           p = item._2
           contextCache = item._3
-          val r =  item._4
+          val r = item._4
           total = r.total
           totalPageSize = r.totalPageSize
           paramterHasList = r.paramterHasList
         } catch {
           case e: ClassCastException => {
-            val itemList = execTree.asInstanceOf[(Seq[mutable.Map[String, AnyRef]], Seq[(mutable.Map[String, AnyRef], mutable.Map[String, AnyRef])], String,ResultParameter)]
+            val itemList = execTree.asInstanceOf[(Seq[mutable.Map[String, AnyRef]], Seq[(mutable.Map[String, AnyRef], mutable.Map[String, AnyRef])], String, ResultParameter)]
             objList = itemList._1
             pList = itemList._2
-            val r =  itemList._4
-          total = r.total
-          totalPageSize = r.totalPageSize
-          paramterHasList = r.paramterHasList
+            val r = itemList._4
+            total = r.total
+            totalPageSize = r.totalPageSize
+            paramterHasList = r.paramterHasList
           }
         }
 
@@ -310,24 +317,24 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
           }
           if (p.isEmpty) p("href") = href
           currentRefDocId = docId
-          singleMapParameter(1,docId, currentRefDocId, resObj, taskEntityList, p, url, null, method, page, pageSize, fistPageSize, total, null, totalPageSize, maxPage, contextCache)
+          singleMapParameter(1, docId, currentRefDocId, resObj, taskEntityList, p, url, null, method, page, pageSize, fistPageSize, total, null, totalPageSize, maxPage, contextCache)
         }
 
         if (refUrl != null) {
           if (pList != null && pList.size > 0) {
             for (p <- pList) {
-              singleMapParameter(refStartPage,docId, currentRefDocId, resObj, taskEntityList, p, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
+              singleMapParameter(refStartPage, docId, currentRefDocId, resObj, taskEntityList, p, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
             }
           } else if (p != null && !p.isEmpty) {
             if (!paramterHasList) {
-              singleMapParameter(refStartPage,docId, currentRefDocId, resObj, taskEntityList, p, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
+              singleMapParameter(refStartPage, docId, currentRefDocId, resObj, taskEntityList, p, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
             } else {
               var isList: Boolean = false
               val paList = p.filter(_._2.isInstanceOf[Seq[mutable.Map[String, AnyRef]]]).asInstanceOf[Seq[mutable.Map[String, AnyRef]]]
-              if (paList.size <= 0) singleMapParameter(refStartPage,docId, currentRefDocId, resObj, taskEntityList, p, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
+              if (paList.size <= 0) singleMapParameter(refStartPage, docId, currentRefDocId, resObj, taskEntityList, p, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
               else paList.map(_ ++= p.filterNot(_._2.isInstanceOf[Seq[mutable.Map[String, AnyRef]]]).asInstanceOf[mutable.Map[String, AnyRef]])
               for (pa <- paList) {
-                singleMapParameter(refStartPage,docId, currentRefDocId, resObj, taskEntityList, pa, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
+                singleMapParameter(refStartPage, docId, currentRefDocId, resObj, taskEntityList, pa, refUrl, refPostParamters, refMethod, refPage, refPageSize, refFistPageSize, total, refDocFirstUrl, totalPageSize, refMaxPage, contextCache)
               }
             }
           }
@@ -360,7 +367,7 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
     if (context != null) childTaskEntity.contextJsonString = context
   }
 
-  private def singleMapParameter(refStartPage: Int,docId: String, currentRefDocId: String, resObj: ResObj, taskEntityList: ListBuffer[CrawlerTaskEntity],
+  private def singleMapParameter(refStartPage: Int, docId: String, currentRefDocId: String, resObj: ResObj, taskEntityList: ListBuffer[CrawlerTaskEntity],
                                  p: AnyRef, refUrl: String, refPostParamters: Map[String, AnyRef],
                                  refMethod: String, page: Boolean, pageSize: Int, fistPageSize: Int, total: Int,
                                  refDocFirstUrl: String, totalPageSize: Int, maxPage: Int, contextCache: Map[String, AnyRef]): Unit = {
@@ -382,13 +389,13 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
       requestP = p.asInstanceOf[Map[String, AnyRef]]
     }
     if (refMethod.toLowerCase.trim.equals("post")) {
-      processPostRequest(refStartPage,taskEntityList, docId, currentRefDocId, taskEntity.currentDepthCompleted.toBoolean, requestP, refPostParamters, childTaskEntity, refUrl, page, pageSize, fistPageSize, total, refDocFirstUrl, totalPageSize, maxPage)
+      processPostRequest(refStartPage, taskEntityList, docId, currentRefDocId, taskEntity.currentDepthCompleted.toBoolean, requestP, refPostParamters, childTaskEntity, refUrl, page, pageSize, fistPageSize, total, refDocFirstUrl, totalPageSize, maxPage)
     } else {
-      processGetRequest(refStartPage,docId, currentRefDocId, taskEntity.currentDepthCompleted.toBoolean, refUrl, childTaskEntity, taskEntityList, requestP, page, pageSize, fistPageSize, total, refDocFirstUrl, totalPageSize, maxPage)
+      processGetRequest(refStartPage, docId, currentRefDocId, taskEntity.currentDepthCompleted.toBoolean, refUrl, childTaskEntity, taskEntityList, requestP, page, pageSize, fistPageSize, total, refDocFirstUrl, totalPageSize, maxPage)
     }
   }
 
-  private def processGetRequest(refStartPage: Int,docId: String, currentRefDocId: String, currentDepthCompleted: Boolean, refUrl: String, childTaskEntity: CrawlerTaskEntity, taskEntityList: ListBuffer[CrawlerTaskEntity], p: Map[String, AnyRef], page: Boolean, pageSize: Int, fistPageSize: Int, total: Int,
+  private def processGetRequest(refStartPage: Int, docId: String, currentRefDocId: String, currentDepthCompleted: Boolean, refUrl: String, childTaskEntity: CrawlerTaskEntity, taskEntityList: ListBuffer[CrawlerTaskEntity], p: Map[String, AnyRef], page: Boolean, pageSize: Int, fistPageSize: Int, total: Int,
                                 refDocFirstUrl: String, totalPageSize: Int, maxPage: Int): Unit = {
     var refu = refUrl
     var refFirstUrl = refDocFirstUrl
@@ -414,27 +421,27 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
           }
         }
 
-        if (cnt != 0 && cnt == matchList.size) 
+        if (cnt != 0 && cnt == matchList.size)
           refu = childTaskEntity.taskURI
 
-          if (refFirstUrl != null) {
-            val matchFirstList = Util.regexExtract(refFirstUrl, Constant(conf).DOLLAR).asInstanceOf[Seq[String]]
-            val regexModelFirstUrl = regexModelFirst.replaceAll("model", key)
-            breakable {
-              for (m <- matchFirstList) {
-                if (key.trim.equalsIgnoreCase(m)) {
-                  refFirstUrl = refFirstUrl.replaceAll(regexModelFirstUrl, valu)
-                  break
-                }
+        if (refFirstUrl != null) {
+          val matchFirstList = Util.regexExtract(refFirstUrl, Constant(conf).DOLLAR).asInstanceOf[Seq[String]]
+          val regexModelFirstUrl = regexModelFirst.replaceAll("model", key)
+          breakable {
+            for (m <- matchFirstList) {
+              if (key.trim.equalsIgnoreCase(m)) {
+                refFirstUrl = refFirstUrl.replaceAll(regexModelFirstUrl, valu)
+                break
               }
             }
           }
-        
+        }
+
 
         if (!childTaskEntity.currentDepthCompleted.trim.toBoolean) {
           childTaskEntity.currentDepthCompleted = "true"
         }
-        if (page || pageSize != -1) calPagesAndGenSubTaskEntitys(refStartPage,null, true, taskEntityList, docId, currentDepthCompleted, childTaskEntity, refu, page, pageSize, fistPageSize, total, refFirstUrl, totalPageSize, maxPage)
+        if (page || pageSize != -1) calPagesAndGenSubTaskEntitys(refStartPage, null, true, taskEntityList, docId, currentDepthCompleted, childTaskEntity, refu, page, pageSize, fistPageSize, total, refFirstUrl, totalPageSize, maxPage)
         else {
           childTaskEntity.taskURI = refu
           taskEntityList += childTaskEntity
@@ -443,7 +450,7 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
     }
   }
 
-  private def processPostRequest(refStartPage: Int,taskEntityList: ListBuffer[CrawlerTaskEntity], docId: String, currentRefDocId: String, currentDepthCompleted: Boolean, p: Map[String, AnyRef], refPostParamters: Map[String, AnyRef], childTaskEntity: CrawlerTaskEntity, refUrl: String, page: Boolean, pageSize: Int, fistPageSize: Int, total: Int,
+  private def processPostRequest(refStartPage: Int, taskEntityList: ListBuffer[CrawlerTaskEntity], docId: String, currentRefDocId: String, currentDepthCompleted: Boolean, p: Map[String, AnyRef], refPostParamters: Map[String, AnyRef], childTaskEntity: CrawlerTaskEntity, refUrl: String, page: Boolean, pageSize: Int, fistPageSize: Int, total: Int,
                                  refDocFirstUrl: String, totalPageSize: Int, maxPage: Int): Unit = {
     var refURL = refUrl
     childTaskEntity.taskURI = refUrl
@@ -465,7 +472,7 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
       }
       paramsDataMap.put(postKey, postVal)
     }
-    if (page || pageSize != -1) calPagesAndGenSubTaskEntitys(refStartPage,paramsDataMap, true, taskEntityList, docId, currentDepthCompleted, childTaskEntity, refUrl, page, pageSize, fistPageSize, total, refDocFirstUrl, totalPageSize, maxPage)
+    if (page || pageSize != -1) calPagesAndGenSubTaskEntitys(refStartPage, paramsDataMap, true, taskEntityList, docId, currentDepthCompleted, childTaskEntity, refUrl, page, pageSize, fistPageSize, total, refDocFirstUrl, totalPageSize, maxPage)
     else {
       postToTaskEntity(taskEntityList, childTaskEntity, paramsDataMap)
       taskEntityList += childTaskEntity
@@ -480,7 +487,7 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
     childTaskEntity.parentTaskToParames = params
   }
 
-  def calPagesAndGenSubTaskEntitys(refStartPage: Int,paramsDataMap: util.Map[String, AnyRef], isGetMethod: Boolean, taskEntityList: ListBuffer[CrawlerTaskEntity], docId: String, currentDepthCompleted: Boolean, childTaskEntity: CrawlerTaskEntity, refUrl: String,
+  def calPagesAndGenSubTaskEntitys(refStartPage: Int, paramsDataMap: util.Map[String, AnyRef], isGetMethod: Boolean, taskEntityList: ListBuffer[CrawlerTaskEntity], docId: String, currentDepthCompleted: Boolean, childTaskEntity: CrawlerTaskEntity, refUrl: String,
                                    page: Boolean, pageSize: Int, fistPageSize: Int, total: Int, refDocFirstUrl: String, totalPageSize: Int, maxPage: Int): Unit = {
     var reffL = refUrl
     if (page || pageSize != -1) {
@@ -508,7 +515,7 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
           //tmpTotalPageCnt = 1
           tmpFistPageSize = fistPageSize
 
-         // startPage = 2
+          // startPage = 2
         }
 
         if (!currentDepthCompleted) startPage = 2
@@ -529,7 +536,7 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
           for (i <- startPage to tmpTotalPageCnt) {
             val cloneChildTaskEntity = childTaskEntity.allCloneSelf()
             var tI = i
-               if (refDocFirstUrl != null) tI = tI+1
+            if (refDocFirstUrl != null) tI = tI + 1
             if (isGetMethod) {
               cloneChildTaskEntity.taskURI = urlGenCurrentPage(tI, reffL)
             } else {
@@ -597,16 +604,16 @@ private[crawler] object SchemeTopicParser {
 
     //testFilterRegex
     //testFilterNot
-    
+
     testLng
   }
-  
-  def testLng()={
-    
-    val source ="src=http://apis.map.qq.com/ws/staticmap/v2/?key=I3OBZ-MBSRQ-WBJ5P-G5VZS-QGAIF-Y7B27&size=240*90&center={lat},{lng}&zoom=15&markers=icon:http({lng:116.518197,lat:39.923966})"
+
+  def testLng() = {
+
+    val source = "src=http://apis.map.qq.com/ws/staticmap/v2/?key=I3OBZ-MBSRQ-WBJ5P-G5VZS-QGAIF-Y7B27&size=240*90&center={lat},{lng}&zoom=15&markers=icon:http({lng:116.518197,lat:39.923966})"
     val lng = "(\\{lng:.+,lat:.+\\d\\})"
     println(Util.regexExtract(source.toString(), lng, 1).asInstanceOf[String])
-    
+
   }
 
   def testFilterNot() = {

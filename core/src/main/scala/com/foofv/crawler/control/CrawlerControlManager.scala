@@ -84,10 +84,10 @@ private[crawler] object CrawlerControlManager {
   }
 
   def main(argString: Array[String]): Unit = {
-    val conf = new CrawlerConf
+    val conf = new CrawlerConf()
     val args = new MasterArguments(argString, conf)
-    //args.host = "192.168.10.146"
-    //args.port = 9997
+    args.host = "192.168.1.72"
+    args.port = 9997
     //args.host = ""
     //args.port = 19997
     //args.host = "192.168.10.25"

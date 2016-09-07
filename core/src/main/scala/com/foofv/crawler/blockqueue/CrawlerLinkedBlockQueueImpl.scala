@@ -8,11 +8,12 @@ import com.foofv.crawler.CrawlerConf
 import scala.collection.mutable.HashMap
 
 /**
- * The Blocking Queue of Array,it need a array size
- * @author soledede
- */
+  * The Blocking Queue of Array,it need a array size
+  *
+  * @author soledede
+  */
 
-private[crawler] class CrawlerLinkedBlockQueueImpl[T] private (conf: CrawlerConf, blockLength: Int) extends CrawlerBlockQueue[T] with Logging {
+private[crawler] class CrawlerLinkedBlockQueueImpl[T] private(conf: CrawlerConf, blockLength: Int) extends CrawlerBlockQueue[T] with Logging {
 
   def this(conf: CrawlerConf) = this(conf, -1)
 
@@ -50,16 +51,28 @@ private[crawler] class CrawlerLinkedBlockQueueImpl[T] private (conf: CrawlerConf
 private[crawler] object CrawlerLinkedBlockQueueImpl {
 
   private var instanceMap = new HashMap[String, AnyRef]()
+  val lock = new Object()
 
   def apply[T](bizCode: String, conf: CrawlerConf): CrawlerLinkedBlockQueueImpl[T] = {
-    if (!instanceMap.contains(bizCode))
-      instanceMap(bizCode) = new CrawlerLinkedBlockQueueImpl[T](conf)
+    if (!instanceMap.contains(bizCode)) {
+      lock.synchronized {
+        if (!instanceMap.contains(bizCode)) {
+          instanceMap(bizCode) = new CrawlerLinkedBlockQueueImpl[T](conf)
+        }
+      }
+    }
     instanceMap(bizCode).asInstanceOf[CrawlerLinkedBlockQueueImpl[T]]
   }
 
   def apply[T](bizCode: String, blockLength: Int, conf: CrawlerConf): CrawlerLinkedBlockQueueImpl[T] = {
-    if (!instanceMap.contains(bizCode))
-      instanceMap(bizCode) = new CrawlerLinkedBlockQueueImpl[T](conf, blockLength)
+    if (!instanceMap.contains(bizCode)) {
+      lock.synchronized {
+        if (!instanceMap.contains(bizCode)) {
+          instanceMap(bizCode) = new CrawlerLinkedBlockQueueImpl[T](conf, blockLength)
+        }
+      }
+    }
+
     instanceMap(bizCode).asInstanceOf[CrawlerLinkedBlockQueueImpl[T]]
   }
 

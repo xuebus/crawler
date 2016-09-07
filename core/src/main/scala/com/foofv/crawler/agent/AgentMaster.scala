@@ -1,6 +1,7 @@
 package com.foofv.crawler.agent
 
 import java.util.concurrent.TimeUnit
+import com.foofv.crawler.control.client.CrawlerControlClient
 import com.foofv.crawler.parse.worker.WorkerInf
 import scala.collection.mutable.HashMap
 import scala.util.control.Breaks._
@@ -33,6 +34,7 @@ private[crawler] class AgentMaster(
   override val port: Int,
   conf: CrawlerConf)
   extends Master(host, port, conf) with ICrawlerBlockQueueFactory with IAntiSpammingFactory {
+
 
   //open two threads move task from redis queue to local block queue
 
@@ -306,7 +308,7 @@ private[crawler] class AgentMaster(
 private[crawler] object AgentMaster {
 
   val systemName = "crawlerMasterSys"
-  private val actorName = "AgentMaster"
+   val actorName = "AgentMaster"
   val crawlerUrlRegex = "crawler://([^:]+):([0-9]+)".r
 
   def main(argStrings: Array[String]): Unit = {

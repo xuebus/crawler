@@ -1,8 +1,9 @@
 package com.foofv.crawler.control.client
 
 import java.util.Collections
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor._
 import com.foofv.crawler.CrawlerConf
+import com.foofv.crawler.agent.AgentMaster
 import com.foofv.crawler.deploy.TransferMsg._
 import com.foofv.crawler.enumeration._
 import com.foofv.crawler.parse.topic.entity.{ShopId, AddressInfo}
@@ -17,6 +18,10 @@ import com.foofv.crawler.parse.master.MasterArguments
 private[crawler] class CrawlerControlClient(/*host: String, port: Int,*/ conf: CrawlerConf) extends Actor
 with ActorLogReceive with Logging {
 
+
+  override def preStart(): Unit = {
+  }
+
   implicit val to = akka.util.Timeout.apply(3, java.util.concurrent.TimeUnit.SECONDS)
 
   val remoteActorSystemName = conf.get("", "crawlerControlManagerSys")
@@ -24,7 +29,7 @@ with ActorLogReceive with Logging {
 
   //val remoteHost = "123.57.239.78"
   val remoteHostPort = 9997
-  val remoteHost = "192.168.10.146"
+  val remoteHost = "192.168.1.72"
   //val remoteHostPort = 9997
   //val remoteHost = "192.168.10.25"
   //val remoteHost = "192.168.40.53"
@@ -51,6 +56,7 @@ with ActorLogReceive with Logging {
 
 private[crawler] object CrawlerControlClient extends Logging {
 
+
   var actor: ActorRef = null
 
   def main(argStrings: Array[String]): Unit = {
@@ -61,8 +67,8 @@ private[crawler] object CrawlerControlClient extends Logging {
     //args.port = 9996
     //args.port = 9999
 
-    //args.host = "192.168.10.25"
-    //args.port = 9997
+    args.host = "192.168.1.72"
+    args.port = 9999
 
     val (actorSystem, _) = startSystemAndActor(args.host, args.port, conf)
     //val (actorSystem, _) = startSystemAndActor( "192.168.10.25", 10007, conf)
@@ -320,7 +326,7 @@ private[crawler] object CrawlerControlClient extends Logging {
       " PHOENIX_ID=0a017626-14faaa6f348-eaba0e; __utma=1.58018458.1441621883.1441621883.1441676807.2;" +
       " __utmc=1; __utmz=1.1441621883.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); s_ViewType=10; " +
       "JSESSIONID=AAE53EF5FEA86445BCE52E83C5A81B2D; aburl=1; cy=3317; cye=delhi\"," +
-      "\"schemeFile\":\"src/main/resources/dianping-city.xml\"}"
+      "\"schemeFile\":\"core/src/main/resources/dianping-city.xml\"}"
 
     val taskJsonMsg = "{" + jobNameJsonStr + "\"task\":" + taskTemplate + "}"
     actor ! TaskJsonMsg(taskJsonMsg)
@@ -350,7 +356,7 @@ private[crawler] object CrawlerControlClient extends Logging {
       "\"topciCrawlerParserClassName\":\"com.foofv.crawler.parse.topic.SchemeTopicParser\"," +
       "\"userAgent\":\"User-Agent:Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36 LBBROWSER\"," +
       "\"cookies\":\"navCtgScroll=19; showNav=#nav-tab|0|1; _hc.v=\'a0ab31e4-0f98-432c-a878-0c77d0e2f49d.1443169414\'; __utma=1.2007844807.1443172774.1443496210.1443509743.4; __utmz=1.1443172774.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); PHOENIX_ID=0a017918-1504543bfe7-11d4ed9; s_ViewType=10; JSESSIONID=EEBC7E5E490EEFD0CCFE98402206BE31; aburl=1; cy=2; cye=beijing\"," +
-      "\"schemeFile\":\"src/main/resources/dianping-city-region.xml\"}"
+      "\"schemeFile\":\"core/src/main/resources/dianping-city-region.xml\"}"
 
     val taskJsonMsg = "{" + jobNameJsonStr + "\"task\":" + taskTemplate + "}"
     actor ! TaskJsonMsg(taskJsonMsg)
