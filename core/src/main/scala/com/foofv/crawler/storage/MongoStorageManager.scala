@@ -13,45 +13,21 @@ import scala.collection.mutable.Map
 import com.foofv.crawler.entity.ResObj
 
 /**
- * Created by msfenn on 16/07/15.
- */
+  * Created by msfenn on 16/07/15.
+  */
 class MongoStorageManager private(conf: CrawlerConf) extends StorageManager {
 
   override def put[T: ClassTag](entity: T): Boolean = {
-
-
     if (entity.isInstanceOf[AnyRef] && !entity.isInstanceOf[(Array[AnyRef], Boolean)] && !entity.isInstanceOf[(Class[AnyRef], Array[AnyRef], Array[String], Array[Array[AnyRef]], Boolean)] && !entity.isInstanceOf[(String, Seq[mutable.Map[String, AnyRef]])]) {
       MongoStorage.saveEntity(entity)
     } else if (entity.isInstanceOf[(_, _)]) {
       try {
-        val tuEntity = entity.asInstanceOf[(String, Seq[Map[String, AnyRef]])]
+        val tuEntity = entity.asInstanceOf[(String, Seq[mutable.Map[String, AnyRef]])]
         val oE = tuEntity._2
-        if (oE == null) {
-          logInfo("no schema object,We have returned......")
-          return false
-        } else {
-          try {
-            val docsToSave: util.List[Document] = new util.ArrayList[Document]
-            import scala.collection.JavaConversions._
-            for (doc <- oE) {
-              val javaDoc = doc.map { m =>
-                if (m._2.isInstanceOf[Seq[mutable.Map[String, AnyRef]]]) {
-                  val listBuffer = m._2.asInstanceOf[Seq[mutable.Map[String, AnyRef]]]
-                  val conList = listBuffer.map(_.asJava).asJava
-                  (m._1, conList)
-                } else (m._1, m._2)
-              }
-              docsToSave.add(new Document(javaDoc))
-            }
-            MongoStorage.saveDocuments(tuEntity._1, docsToSave)
-            true
-          }
-          catch {
-            case e: Exception if !e.isInstanceOf[java.lang.ClassCastException] => {
-              logError("save entity to mongo failed", e);
-              false
-            }
-          }
+        val tableName = tuEntity._1
+        saveTupleEntityToMongo(tableName, oE) match {
+          case Some(toReturn) => return toReturn
+          case None => return false
         }
       }
       catch {
@@ -113,6 +89,45 @@ class MongoStorageManager private(conf: CrawlerConf) extends StorageManager {
       false*/
   }
 
+
+  def saveTupleEntityToMongo[T: ClassTag](tableName: String, oE: Seq[mutable.Map[String, AnyRef]]): Option[Boolean] = {
+    if (oE == null) {
+      logInfo("no schema object,We have returned......")
+      return Some(false)
+    } else {
+      try {
+        val docsToSave: util.List[Document] = new util.ArrayList[Document]
+        import scala.collection.JavaConversions._
+        for (doc <- oE) {
+          val javaDoc = doc.map { m =>
+            if (m._2.isInstanceOf[Seq[mutable.Map[String, AnyRef]]]) {
+              val listBuffer = m._2.asInstanceOf[Seq[mutable.Map[String, AnyRef]]]
+              val conList = listBuffer.map(_.asJava).asJava
+              (m._1, conList)
+            } else (m._1, m._2)
+          }
+          docsToSave.add(new Document(javaDoc))
+        }
+        MongoStorage.saveDocuments(tableName, docsToSave)
+        true
+      }
+      catch {
+        case e: Exception if !e.isInstanceOf[ClassCastException] => {
+          logError("save entity to mongo failed", e);
+          false
+        }
+      }
+    }
+    None
+  }
+
+  override def put(tableName: String, entitys: Seq[mutable.Map[String, AnyRef]]): Boolean = {
+    saveTupleEntityToMongo(tableName, entitys) match {
+      case Some(toReturn) => return toReturn
+      case None => return false
+    }
+  }
+
   override def getByKey[T: ClassTag](key: String): T = {
     MongoStorage.getByKey(classTag[T].runtimeClass.asInstanceOf[Class[T]], key)
   }
@@ -126,14 +141,14 @@ class MongoStorageManager private(conf: CrawlerConf) extends StorageManager {
   }
 }
 
-object MongoStorageManager extends App {
+object MongoStorageManager{
 
   var singleton: MongoStorageManager = null
   val lock = new Object()
 
   def apply(conf: CrawlerConf): MongoStorageManager = {
     if (singleton == null) {
-      lock.synchronized{
+      lock.synchronized {
         if (singleton == null) {
           singleton = new MongoStorageManager(conf)
         }

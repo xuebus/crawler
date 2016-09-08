@@ -1,0 +1,20 @@
+<docs table="sougou_relate_words">
+    <doc docid="knowledge_graph"
+         url="http://54.222.222.172:9000/api/news/allnode"
+         method="get" firstdoc="true">
+        <list jsonselector="message" name="nodes" >
+            <text name="node" parameter="true"  notsave="true"/>
+        </list>
+        <ref docid="sougou_search"/>
+    </doc>
+
+    <!--https://www.sogou.com/web?query=%E6%96%AF%E8%92%82%E8%8A%AC&_asf=www.sogou.com&from=index-nologin&_ast=&w=01019900&p=40040100&ie=utf8&sut=2041&sst0=1473302817717&lkt=0%2C0%2C0-->
+    <!--http://www.sogou.com/web?query=${node}&amp;ie=utf8&amp;_ast=1473223296&amp;_asf=null&amp;w=01029901&amp;cid=&amp;cid=-->
+    <doc docid="sougou_search"
+         url="https://www.sogou.com/web?query=${node}&amp;_asf=www.sogou.com&amp;from=index-nologin&amp;_ast=&amp;w=01019900&amp;p=40040100&amp;ie=utf8&amp;sut=2041&amp;sst0=1473302817717&amp;lkt=0%2C0%2C0"
+         method="get">
+        <list selector="div#stable_uphint a" name="words" isfield="true">
+            <text name="word" selector="a" />
+        </list>
+    </doc>
+</docs>

@@ -100,7 +100,8 @@ private[crawler] object CrawlerControlClient extends Logging {
     //actor ! TaskMsgMeituanTakeout(size = 100, batchSize = 10, startIndex = 31)
     //submitMeituanFoodMerchantTask(actor)
     //submitDianpingCusineCategoryTask(actor)
-    submitDianpingRegionTask(actor)
+    //submitDianpingRegionTask(actor)
+    submitSougouWordsTask(actor)
     (actorSystem, boundPort)
   }
 
@@ -358,6 +359,18 @@ private[crawler] object CrawlerControlClient extends Logging {
       "\"cookies\":\"navCtgScroll=19; showNav=#nav-tab|0|1; _hc.v=\'a0ab31e4-0f98-432c-a878-0c77d0e2f49d.1443169414\'; __utma=1.2007844807.1443172774.1443496210.1443509743.4; __utmz=1.1443172774.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); PHOENIX_ID=0a017918-1504543bfe7-11d4ed9; s_ViewType=10; JSESSIONID=EEBC7E5E490EEFD0CCFE98402206BE31; aburl=1; cy=2; cye=beijing\"," +
       "\"schemeFile\":\"core/src/main/resources/dianping-city-region.xml\"}"
 
+    val taskJsonMsg = "{" + jobNameJsonStr + "\"task\":" + taskTemplate + "}"
+    actor ! TaskJsonMsg(taskJsonMsg)
+  }
+
+  def submitSougouWordsTask(actor: ActorRef, jobName: String = "sougou_relate_words") {
+    val jobNameTemplate = "\"jobname\":\"@jobname\",\"jobid\":@jobid,"
+    val jobNameJsonStr = jobNameTemplate.replaceFirst("@jobname", jobName).replace("@jobid", "" + "123456789")
+    val taskTemplate = "{\"taskType\":0,\"totalBatch\":1," +
+      "\"topciCrawlerParserClassName\":\"com.foofv.crawler.parse.topic.SchemeTopicParser\"," +
+      "\"userAgent\":\"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36\"," +
+      "\"cookies\":\"CXID=C40BE321B17FD94F716DCF255E9A4152; SUV=001D5A0074E7B63F578DF3F5988BC557; ABTEST=7|1471862484|v17; jrtt_at=888409eafdbcb29c4aecc0b4c792e6ee; pgv_pvi=9315617792; SNUID=DF2EC6DDC6C0FE7AF04A331DC62A79B6; ssuid=1422058140; taspeed=taspeedexist; pgv_si=s9418547200; ad=qM03RZllll2gAVznlllllVK5rb1lllllohh7nkllllklllllxZlll5@@@@@@@@@@; IPLOC=CN3100; _ga=GA1.2.397512803.1473228324; SUID=1AE8001B4A6C860A5775E20900069A4E; sct=53; sst0=102; ld=glllllllll2gmHbrlllllVKy8SZlllllNnWL5ZllllGllllljllll5@@@@@@@@@@; browerV=3; osV=1; PHPSESSID=7ca007km04idq332omuumr3nf7; SUIR=DF2EC6DDC6C0FE7AF04A331DC62A79B6; LSTMV=753%2C177; LCLKINT=25583\"," +
+      "\"schemeFile\":\"core/src/main/resources/sougou-relate-words.xml\"}"
     val taskJsonMsg = "{" + jobNameJsonStr + "\"task\":" + taskTemplate + "}"
     actor ! TaskJsonMsg(taskJsonMsg)
   }

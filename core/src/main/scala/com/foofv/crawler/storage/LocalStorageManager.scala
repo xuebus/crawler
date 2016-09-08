@@ -2,6 +2,7 @@ package com.foofv.crawler.storage
 
 import com.foofv.crawler.CrawlerConf
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 /**
@@ -10,11 +11,14 @@ import scala.reflect.ClassTag
 private[crawler] class LocalStorageManager private (conf: CrawlerConf) extends StorageManager{
   override def put[T: ClassTag](entity: T): Boolean = {
     println(entity.toString)
-    false
+    true
   }
 
+  override def put(tableName: String, entitys: Seq[mutable.Map[String, AnyRef]]): Boolean = {
+    true
+  }
 }
-object LocalStorageManager extends App {
+object LocalStorageManager {
 
   var singleton: LocalStorageManager = null
   val lock = new Object()

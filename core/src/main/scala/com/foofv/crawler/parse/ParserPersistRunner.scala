@@ -22,6 +22,7 @@ import com.foofv.crawler.enumeration.NeedSaveParser
 import com.foofv.crawler.storage.StorageManager
 
 import scala.collection.mutable
+import scala.collection.mutable.{ListBuffer, Map}
 
 /**
   * the thread of parser
@@ -34,9 +35,11 @@ private[crawler] class ParserPersistRunner(parser: Parser, resObj: ResObj, obj: 
     // isNeedSaveParserYslf is for user parser and save object by himself/herself
     resObj.tastEntity.isNeedSaveParserYslf match {
       case NeedSaveParser.NO_NEED =>
+        //obj =null
         val retrunObj = parser.parse(resObj)
         if (retrunObj != null) saveEntity(retrunObj)
         else {
+          //eg: (sougou_relate_words,ListBuffer(Map(word -> 中科三环), Map(word -> 长城信息), Map(word -> 北方稀土), Map(word -> 招商证券), Map(word -> 正海磁材), Map(word -> 宗申动力)))
           saveEntity(parser.parse(resObj, obj))
         }
       case NeedSaveParser.NEED => parser.parseYourSelf(resObj, obj)
@@ -58,12 +61,18 @@ private[crawler] class ParserPersistRunner(parser: Parser, resObj: ResObj, obj: 
     // TODO 
     try {
       var storage: StorageManager = null
-      if (conf.getBoolean("local", false)) {
+      if(resObj.tastEntity.storage.equalsIgnoreCase("file")){
         storage = StorageManager("local", conf)
-      } else {
+      }else{
         storage = StorageManager("mongo", conf)
       }
-
+      if(storage==null){
+        if (conf.getBoolean("local", false)) {
+          storage = StorageManager("local", conf)
+        } else {
+          storage = StorageManager("mongo", conf)
+        }
+      }
       if (entity.isInstanceOf[Seq[_]]) {
         val list: Seq[_] = entity.asInstanceOf[Seq[_]]
         list.foreach(e => try {
@@ -72,6 +81,16 @@ private[crawler] class ParserPersistRunner(parser: Parser, resObj: ResObj, obj: 
         } catch {
           case t: Throwable => logError("save entity to mongo failed", t)
         })
+      } else if (entity.isInstanceOf[(String, Seq[Map[String, AnyRef]])]) {
+        try {
+          //(tablename,List[Map[jobId->1,word->九州]])
+          val tuEntity = entity.asInstanceOf[(String, Seq[Map[String, AnyRef]])]
+          val tableName = tuEntity._1
+          val oE = tuEntity._2
+          storage.put(tableName, oE)
+        } catch {
+          case t: Throwable => logError("save entity(eg:tablename,List[Map[jobId->1,word->九州]])) to mongo failed", t)
+        }
       } else {
         r = storage.put(entity)
       }

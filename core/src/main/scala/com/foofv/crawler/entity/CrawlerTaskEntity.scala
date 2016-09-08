@@ -5,21 +5,23 @@ import java.util.UUID
 
 import org.apache.commons.lang3.builder.ToStringBuilder
 import org.apache.commons.lang3.builder.ToStringStyle
-import com.foofv.crawler.enumeration.{CrawlerTaskType, CrawlerTaskFetchStatus, CrawlerTaskRuleUpdateType, HttpRequestMethodType}
+import com.foofv.crawler.enumeration.{CrawlerTaskFetchStatus, CrawlerTaskRuleUpdateType, CrawlerTaskType, HttpRequestMethodType}
 import redis.ByteStringFormatter
 import akka.util.ByteString
 import com.foofv.crawler.enumeration.NeedSaveParser
 import com.foofv.crawler.enumeration.StoragePlugin
 import org.apache.commons.beanutils.BeanUtils
 import java.util.regex.Pattern
+import javax.swing.JPopupMenu.Separator
+
 import scala.actors.threadpool.AtomicInteger
 
 /**
- * @author soledede
- * @email wengbenjue@163.com
- *        taskEntity abstract
- *
- */
+  * @author soledede
+  * @email wengbenjue@163.com
+  *        taskEntity abstract
+  *
+  */
 private[crawler] class CrawlerTaskEntity(
                                           var taskId: String = CrawlerTaskEntity.geneTaskId, // every crawlerTaskEntity have unique taskId, Not Null
                                           var parentTaskId: String = "null", // default "null"
@@ -63,12 +65,13 @@ private[crawler] class CrawlerTaskEntity(
                                           var keyWordsOfInvalid: String = "null",
                                           var contextJsonString: String = "null",
                                           var tableName: String = "null",
-                                          var isStream: Int = 0) extends Serializable with Cloneable {
+                                          var isStream: Int = 0,
+                                          var storage: String = "mongodb" // mongodb or file
+                                        ) extends Serializable with Cloneable {
 
   override def toString(): String = {
     ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE)
   }
-
 
 
   def allCloneSelf(): CrawlerTaskEntity = {
@@ -114,6 +117,7 @@ private[crawler] class CrawlerTaskEntity(
     task.contextJsonString = this.contextJsonString
     task.tableName = this.tableName
     task.isStream = this.isStream
+    task.storage = this.storage
     /* task.schemaItelligent = this.schemaItelligent
      task.schemaRefUrl = this.schemaRefUrl
      task.schemaPreDocId = this.schemaPreDocId
@@ -157,6 +161,7 @@ private[crawler] class CrawlerTaskEntity(
     task.contextJsonString = this.contextJsonString
     task.tableName = this.tableName
     task.isStream = this.isStream
+    task.storage = this.storage
     /*task.schemaItelligent = this.schemaItelligent
     task.schemaPreDocId = this.schemaPreDocId
     task.schemaPreUrl = this.schemaPreUrl
@@ -196,58 +201,59 @@ private[crawler] class CrawlerTaskEntity(
 }
 
 object CrawlerTaskEntity {
-  private val Seperator = "#&#&#"
+  private val Separator = "#&#&#"
   implicit val byteStringFormatter = new ByteStringFormatter[CrawlerTaskEntity] {
     def serialize(task: CrawlerTaskEntity): ByteString = {
       ByteString(
-        task.taskId + Seperator +
-          task.parentTaskId + Seperator +
-          task.parentTaskToParames + Seperator +
-          task.jobId + Seperator +
-          task.jobName + Seperator +
-          task.currentBatchId + Seperator +
-          task.taskType.id + Seperator +
-          task.taskURI + Seperator +
-          task.taskDomain + Seperator +
-          task.cookies + Seperator +
-          task.userAgent + Seperator +
-          task.charset + Seperator +
-          task.fetchStatus.id + Seperator +
-          task.retryTime + Seperator +
-          task.isUseProxy + Seperator +
-          task.ruleUpdateType.id + Seperator +
-          task.totalDepth + Seperator +
-          task.lastFetchStartTime + Seperator +
-          task.lastFetchFinishedTime + Seperator +
-          task.intervalTime + Seperator +
-          task.taskStartTime + Seperator +
-          task.taskFinishTime + Seperator +
-          task.taskCostTime + Seperator +
-          task.httpmethod.id + Seperator +
-          task.topciCrawlerParserClassName + Seperator +
-          task.isNeedSaveParserYslf.id + Seperator +
+        task.taskId + Separator +
+          task.parentTaskId + Separator +
+          task.parentTaskToParames + Separator +
+          task.jobId + Separator +
+          task.jobName + Separator +
+          task.currentBatchId + Separator +
+          task.taskType.id + Separator +
+          task.taskURI + Separator +
+          task.taskDomain + Separator +
+          task.cookies + Separator +
+          task.userAgent + Separator +
+          task.charset + Separator +
+          task.fetchStatus.id + Separator +
+          task.retryTime + Separator +
+          task.isUseProxy + Separator +
+          task.ruleUpdateType.id + Separator +
+          task.totalDepth + Separator +
+          task.lastFetchStartTime + Separator +
+          task.lastFetchFinishedTime + Separator +
+          task.intervalTime + Separator +
+          task.taskStartTime + Separator +
+          task.taskFinishTime + Separator +
+          task.taskCostTime + Separator +
+          task.httpmethod.id + Separator +
+          task.topciCrawlerParserClassName + Separator +
+          task.isNeedSaveParserYslf.id + Separator +
           //task.crawlerStorage
-          task.currentDepth + Seperator +
-          task.totalBatch + Seperator +
-          task.taskOrdinal + Seperator +
-          task.httpRefer + Seperator +
-          task.currentDepthCompleted + Seperator +
-          task.forbiddenCode + Seperator +
-          task.schemeDocId + Seperator +
-          task.schemeFile + Seperator +
-          task.userAgentType + Seperator +
-          task.taskIp + Seperator +
-          task.proxyHost + Seperator +
-          task.proxyPort + Seperator +
-          task.keyWordsOfInvalid + Seperator +
-          task.contextJsonString + Seperator +
-          task.tableName + Seperator +
-          task.isStream
+          task.currentDepth + Separator +
+          task.totalBatch + Separator +
+          task.taskOrdinal + Separator +
+          task.httpRefer + Separator +
+          task.currentDepthCompleted + Separator +
+          task.forbiddenCode + Separator +
+          task.schemeDocId + Separator +
+          task.schemeFile + Separator +
+          task.userAgentType + Separator +
+          task.taskIp + Separator +
+          task.proxyHost + Separator +
+          task.proxyPort + Separator +
+          task.keyWordsOfInvalid + Separator +
+          task.contextJsonString + Separator +
+          task.tableName + Separator +
+          task.isStream + Separator +
+          task.storage
       )
     }
 
     def deserialize(bs: ByteString): CrawlerTaskEntity = {
-      val r = bs.utf8String.split(Pattern.quote(Seperator)).toList
+      val r = bs.utf8String.split(Pattern.quote(Separator)).toList
       val task = new CrawlerTaskEntity()
       task.taskId = r(0)
       task.parentTaskId = r(1)
@@ -291,6 +297,7 @@ object CrawlerTaskEntity {
       task.contextJsonString = r(39)
       task.tableName = r(40)
       task.isStream = r(41).toInt
+      task.storage = r(42)
       task
     }
   }

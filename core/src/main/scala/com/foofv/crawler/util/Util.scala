@@ -435,7 +435,8 @@ private[crawler] object Util extends Logging {
         val charsetStr = temp.split(";").find { x => x.contains("charset") }
         temp = charsetStr.getOrElse(charset)
         temp = StringUtils.deleteWhitespace(temp)
-        charset = temp.replace("charset=", "")
+        temp = temp.replace("charset=", "")
+        charset = temp.trim.replaceAll("^\"([\\S|\\s]+)\"$", "$1")
       }
     }
     StringUtils.toEncodedString(response.getContent, java.nio.charset.Charset.forName(charset))
