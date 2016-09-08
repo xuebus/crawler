@@ -66,7 +66,8 @@ private[crawler] class CrawlerTaskEntity(
                                           var contextJsonString: String = "null",
                                           var tableName: String = "null",
                                           var isStream: Int = 0,
-                                          var storage: String = "mongodb" // mongodb or file
+                                          var storage: String = "mongodb",
+                                          var originType: String = "pc" // pc or phone
                                         ) extends Serializable with Cloneable {
 
   override def toString(): String = {
@@ -118,6 +119,7 @@ private[crawler] class CrawlerTaskEntity(
     task.tableName = this.tableName
     task.isStream = this.isStream
     task.storage = this.storage
+    task.originType = this.originType
     /* task.schemaItelligent = this.schemaItelligent
      task.schemaRefUrl = this.schemaRefUrl
      task.schemaPreDocId = this.schemaPreDocId
@@ -162,6 +164,7 @@ private[crawler] class CrawlerTaskEntity(
     task.tableName = this.tableName
     task.isStream = this.isStream
     task.storage = this.storage
+    task.originType = this.originType
     /*task.schemaItelligent = this.schemaItelligent
     task.schemaPreDocId = this.schemaPreDocId
     task.schemaPreUrl = this.schemaPreUrl
@@ -248,7 +251,8 @@ object CrawlerTaskEntity {
           task.contextJsonString + Separator +
           task.tableName + Separator +
           task.isStream + Separator +
-          task.storage
+          task.storage + Separator +
+          task.originType
       )
     }
 
@@ -298,6 +302,7 @@ object CrawlerTaskEntity {
       task.tableName = r(40)
       task.isStream = r(41).toInt
       task.storage = r(42)
+      task.originType = r(43)
       task
     }
   }

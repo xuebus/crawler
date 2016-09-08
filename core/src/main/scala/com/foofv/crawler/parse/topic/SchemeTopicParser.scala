@@ -73,7 +73,9 @@ private[crawler] class SchemeTopicParser(conf: CrawlerConf) extends TopicParser 
       var docMap = SchemeTopicParser.schemeDocCacheManager.getIfPresent(jobId)
       if (docMap == null) {
         if (conf.getBoolean("local", false)) {
-          SchemeTopicParser.schemeDocCacheManager.put(jobId, CrawlerControlImpl.semanticTreeMap(jobId))
+          val semanticTree = CrawlerControlImpl.semanticTreeMap(jobId)
+          SchemeTopicParser.schemeDocCacheManager.put(jobId,semanticTree )
+          docMap = SchemeTopicParser.schemeDocCacheManager.getIfPresent(jobId)
         } else {
           if (SchemeTopicParser.controlActor != null) {
             implicit val timeout = akka.util.Timeout.apply(50, java.util.concurrent.TimeUnit.SECONDS)

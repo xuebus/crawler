@@ -15,15 +15,15 @@ private[crawler] class FetchLocal(conf: CrawlerConf) extends Logging{
     new Thread(new Runnable {
       override def run(): Unit = {
         while (true) {
-          val taskEntity = TaskEntityQueue.taskEntityPriorityQueue.take()
-
+          val taskEntityQueue = TaskEntityQueue.taskEntityPriorityQueue
+          val taskEntity = taskEntityQueue.take()
           //start fetch
-          AgentWorker.handleEntity(taskEntity, conf)
-          log.info(s"start fetch process,taskEntity:${taskEntity.toString()}")
-        var interval =  random.nextInt(10 * 1000)
-          interval =  1000*60*3+interval
-          println(s"sleep:$interval s")
-          Thread.sleep(interval)
+            AgentWorker.handleEntity(taskEntity, conf)
+            log.info(s"start fetch process,taskEntity:${taskEntity.toString()}")
+            var interval =  random.nextInt(60 * 1000*2)
+            interval =  1000*60*4+interval
+            println(s"sleep:$interval s")
+            Thread.sleep(interval)
 
         }
       }

@@ -8,14 +8,16 @@ import com.foofv.crawler.parse.worker.WorkerArguments
 import com.foofv.crawler.resource.slave.Worker
 import com.foofv.crawler.util.AkkaUtil
 import akka.actor.ActorSelection.toScala
-import akka.actor.{ ActorRef, ActorSystem, Address, Props }
+import akka.actor.{ActorRef, ActorSystem, Address, Props}
 import com.foofv.crawler.entity.CrawlerTaskEntity
 import com.foofv.crawler.util.Util
 import com.foofv.crawler.downloader.TaskRunner
 import com.foofv.crawler.downloader.Downloader
 import java.util.concurrent.ThreadPoolExecutor
+
 import com.foofv.crawler.util.Logging
 import com.foofv.crawler.util.constant.Constant
+
 import scala.collection.mutable.HashMap
 import com.foofv.crawler.schedule.ITaskQueue
 import com.foofv.crawler.enumeration.HttpRequestMethodType
@@ -25,22 +27,25 @@ import com.foofv.crawler.antispamming.AntiSpamming
 import com.google.common.cache.CacheLoader
 import com.foofv.crawler.antispamming.IAntiSpammingFactory
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+
 import com.foofv.crawler.antispamming.RedisAntiSpamming
+
 import scala.collection.mutable.ArrayBuffer
 import com.foofv.crawler.enumeration.CrawlerDTWorkerType
 
 /**
- * do work
- */
+  * do work
+  */
 private[crawler] class AgentWorker(
-  override val host: String,
-  override val port: Int,
-  override val cores: Int,
-  override val memory: Int,
-  override val masterUrls: Array[String],
-  override val actorSystemName: String,
-  override val actorName: String,
-  override val conf: CrawlerConf) extends Worker(host, port, cores, memory, masterUrls, actorSystemName, actorName, conf) with IAntiSpammingFactory {
+                                    override val host: String,
+                                    override val port: Int,
+                                    override val cores: Int,
+                                    override val memory: Int,
+                                    override val masterUrls: Array[String],
+                                    override val actorSystemName: String,
+                                    override val actorName: String,
+                                    override val conf: CrawlerConf) extends Worker(host, port, cores, memory, masterUrls, actorSystemName, actorName, conf) with IAntiSpammingFactory {
 
   var cralwerUserAgentTask: CrawlerDTWorker = null
   val USERAGENT = "useragent"
@@ -148,6 +153,7 @@ private[crawler] class AgentWorker(
 
   private val HttpProxySeparator = Constant(conf).SEPATOR
   private val invalidHttpProxySet = Constant.CRAWLER_AGENT_WORKER_INVALID_HTTP_PROXY
+
   private def pullProxyFromRedis(): Long = {
     try {
       val HttpProxyKey = Worker._workerId + "_http_proxy"
@@ -158,7 +164,7 @@ private[crawler] class AgentWorker(
         AgentWorker.invalidProxyArray.foreach { x => redisSet.putToSet(invalidHttpProxySet, HttpProxyKey + "_" + x) }
         AgentWorker.invalidProxyArray.clear()
       }
-      
+
       logInfo(s"HttpProxyKey[$HttpProxyKey]")
       val a = redisSet.getAllFromSetByKey(HttpProxyKey)
       AgentWorker.httpProxyArray.clear()
@@ -170,18 +176,17 @@ private[crawler] class AgentWorker(
     } catch {
       case e: Exception => logError("get http_proxy error", e)
     }
-    
+
     //put failed task back to SortedSet
     try {
       val tempFailedTaskEntityList = AgentWorker.failedTaskEntitySet.toList
       AgentWorker.failedTaskEntitySet.clear()
-      tempFailedTaskEntityList.foreach { x =>
-        {
-          if (x != null) {
-            logInfo("put failed task[" + x.taskId + "] back to SortedSet")
-            redisTaskSortedSet.putElementToSortedSet(redisTaskSortedSetKey, x, System.currentTimeMillis() + 5 * 60 * 1000)
-          }
+      tempFailedTaskEntityList.foreach { x => {
+        if (x != null) {
+          logInfo("put failed task[" + x.taskId + "] back to SortedSet")
+          redisTaskSortedSet.putElementToSortedSet(redisTaskSortedSetKey, x, System.currentTimeMillis() + 5 * 60 * 1000)
         }
+      }
       }
     } catch {
       case t: Throwable => logError("put failed task back to SortedSet error", t)
@@ -257,6 +262,7 @@ private[crawler] class AgentWorker(
 
   val workerHandleTaskCountPerMinute = Constant(conf).CRAWLER_AGENT_WORKER_HANDLE_TASK_COUNT_PER_MINUTE_PROXYHOST
   val workerSleepTimeIfRefused = Constant(conf).CRAWLER_AGENT_WORKER_SLEEP_TIME_IF_REFUSED
+
   private def useWorkerIpIfNoProxy(taskEntity: CrawlerTaskEntity): CrawlerTaskEntity = {
     val delayTime = handleTaskTooFastDelayTime * 5
     val workerIp = Worker.WorkerIp
@@ -265,7 +271,9 @@ private[crawler] class AgentWorker(
     val taskId = taskEntity.taskId
     val now = System.currentTimeMillis()
     logInfo(s"no avaliable http proxy for TaskEntity[$taskId]  domain[$taskDomain]")
-    val workerIpUsedTimes = handleTaskRecords.filter(p => { p._1.equalsIgnoreCase(taskEntity.taskDomain) && p._2.equalsIgnoreCase(workerIp) }).size
+    val workerIpUsedTimes = handleTaskRecords.filter(p => {
+      p._1.equalsIgnoreCase(taskEntity.taskDomain) && p._2.equalsIgnoreCase(workerIp)
+    }).size
     if (workerIpUsedTimes >= workerHandleTaskCountPerMinute) {
       logInfo(s"workerIpUsedTimes[$workerIpUsedTimes] too fast, AgentWorker[$workerIp] is not avaliable, put TaskEntity[$taskId]  domain[$taskDomain] to TaskSortedSet, retry [$delayTime] millionseconds later.")
       redisTaskSortedSet.putElementToSortedSet(redisTaskSortedSetKey, taskEntity, System.currentTimeMillis() + delayTime)
@@ -330,8 +338,12 @@ private[crawler] object AgentWorker extends Logging {
   //(proxy, port)
   var httpProxyArray: ArrayBuffer[(String, Int)] = new ArrayBuffer[(String, Int)]
 
+  var userAgentPoint = new AtomicInteger(0)
+
   var userAgentArray: Array[(String, Int)] = Array(
-    ("User-Agent:Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50", 1), //safari 5.1 – MAC
+    ("Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.154 Safari/537.36 LBBROWSER", 1),
+    ("Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36", 1),
+    /*("User-Agent:Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50", 1), //safari 5.1 – MAC
     ("User-Agent:Mozilla/5.0 (Windows; U; Windows NT 6.1; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50", 1), //safari 5.1 – Windows
     ("User-Agent:Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0", 1), //IE 9.0
     ("User-Agent:Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0; Trident/4.0)", 1), //IE 8.0
@@ -353,7 +365,7 @@ private[crawler] object AgentWorker extends Logging {
     ("User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; Avant Browser)", 1), //Avant
     ("User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)", 1), //Green Browser
     ("User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36 LBBROWSER", 1), // Liebao Brower
-
+*/
     //mobile
     ("User-Agent:Mozilla/5.0 (iPhone; U; CPU iPhone OS 4_3_3 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8J2 Safari/6533.18.5", 2), //safari iOS 4.33 – iPhone
     ("User-Agent:Mozilla/5.0 (iPod; U; CPU iPhone OS 4_3_3 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8J2 Safari/6533.18.5", 2), //safari iOS 4.33 – iPod Touch
@@ -395,7 +407,11 @@ private[crawler] object AgentWorker extends Logging {
   }
 
   def handleEntity(taskEntity: CrawlerTaskEntity, conf: CrawlerConf) = {
-    if (agentWorkerThreadPool == null) agentWorkerThreadPool = Util.newDaemonFixedThreadPool(conf.getInt("crawler.agent.worker.threadnum", Util.inferCores()), "agent thread excutor")
+    if (agentWorkerThreadPool == null){
+      val fetchThreadNum = conf.getInt("crawler.agent.worker.threadnum", Util.inferCores())
+      agentWorkerThreadPool = Util.newDaemonFixedThreadPool(fetchThreadNum, "agent thread excutor")
+      println(s"current fetch thread num:${fetchThreadNum}")
+    }
     val taskId = taskEntity.taskId
     val taskUrl = taskEntity.taskURI
     if (taskEntity.isUseProxy == 1 && !taskEntity.proxyHost.trim().equalsIgnoreCase("null")) {
@@ -403,18 +419,28 @@ private[crawler] object AgentWorker extends Logging {
     } else {
       taskEntity.taskIp = Worker.WorkerIp
     }
+    var currentUseAgentArray:Array[(String)] = null
+    if(taskEntity.originType.equalsIgnoreCase("pc")){//this task for pc fetch
+      currentUseAgentArray = userAgentArray.filter(_._2==1).map(_._1)
+    }else{ //for phone
+      currentUseAgentArray = userAgentArray.filter(_._2==2).map(_._1)
+    }
+
+    val userAgent = currentUseAgentArray(userAgentPoint.getAndSet(userAgentPoint.get + 1) % currentUseAgentArray.length)
+    if (userAgentPoint.get() >= currentUseAgentArray.length - 1) userAgentPoint.set(0)
+    taskEntity.userAgent = userAgent
     logInfo(s"begin handle task [$taskId] [$taskUrl]")
     val downloader = Downloader("http", conf)
     agentWorkerThreadPool.execute(new TaskRunner(taskEntity, downloader))
   }
 
   def startSystemAndActor(
-    host: String,
-    port: Int,
-    cores: Int,
-    memory: Int,
-    masterUrls: Array[String],
-    workerNumber: Option[Int] = None): (ActorSystem, Int) = {
+                           host: String,
+                           port: Int,
+                           cores: Int,
+                           memory: Int,
+                           masterUrls: Array[String],
+                           workerNumber: Option[Int] = None): (ActorSystem, Int) = {
 
     val conf = new CrawlerConf
     val systemName = "crawlerWorker" + workerNumber.map(_.toString).getOrElse("")

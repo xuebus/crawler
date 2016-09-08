@@ -166,7 +166,7 @@ private[crawler] class HttpDownloader private(conf: CrawlerConf) extends Downloa
           val taskId = taskEntity.taskId
           val taskUrl = taskEntity.taskURI
           val location = httpResp.getFirstHeader("location").getValue
-          logInfo(s"taskId[$taskId],taskUrl[$taskUrl] HTTP StatusCode 302, redirect location [$location]")
+          logInfo(s"taskId[$taskId],taskUrl[$taskUrl] HTTP StatusCode 302, redirect location [$location],userAgent [${taskEntity.userAgent}]")
           if (taskEntity.keyWordsOfInvalid != null && !taskEntity.keyWordsOfInvalid.equalsIgnoreCase("null") && location != null && location.contains(taskEntity.keyWordsOfInvalid)) {
             refusedState = false
             putTaskEntityBacktoRedisSortedSet = false

@@ -9,7 +9,7 @@ import com.foofv.crawler.entity.{CrawlerTaskEntity, ResObj}
   * Created by soledede.weng on 2016/9/7.
   */
 private[crawler] object TaskEntityQueue {
-  val taskEntityPriorityQueue = new PriorityBlockingQueue[CrawlerTaskEntity](1000, new Comparator[CrawlerTaskEntity] {
+  val taskEntityPriorityQueue = new PriorityBlockingQueue[CrawlerTaskEntity](9000000, new Comparator[CrawlerTaskEntity] {
     override def compare(c1: CrawlerTaskEntity, c2: CrawlerTaskEntity): Int = (c1.taskStartTime - c2.taskStartTime).toInt
   })
 }

@@ -14,4 +14,8 @@ trait DefaultConfiguration extends Configuration {
     * check for unique
     */
   lazy val local: Boolean = Try(config.getBoolean("local")).getOrElse(false)
+  lazy val fetchThreads : Int = Try(config.getInt("crawler.agent.worker.threadnum")).getOrElse(1)
+
+
+
 }

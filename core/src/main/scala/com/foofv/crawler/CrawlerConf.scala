@@ -12,10 +12,11 @@ import com.foofv.crawler.util.Logging
 
 /**
   * @author:soledede
-  * @email:wengbenjue@163.com
+  * @email:wengbenjue @163.com
   */
 private[crawler] class CrawlerConf(loadDefaults: Boolean) extends Cloneable with Logging with Serializable with DefaultConfiguration {
   private[crawler] val settings = new HashMap[String, String]()
+
   import CrawlerConf._
 
   /** Create a CrawlerConf that loads defaults from system properties and the classpath */
@@ -31,6 +32,12 @@ private[crawler] class CrawlerConf(loadDefaults: Boolean) extends Cloneable with
   var fetchLocal: FetchLocal = _
   var parseProcess: ParseProcessLocal = _
   var dataEntityPersistLocal: DataEntityPersistLocal = _
+
+  configSet()
+
+  def configSet() = {
+    this.set("crawler.agent.worker.threadnum", fetchThreads + "")
+  }
 
   init()
 
@@ -60,7 +67,6 @@ private[crawler] class CrawlerConf(loadDefaults: Boolean) extends Cloneable with
 
 
   }
-
 
 
   if (loadDefaults) {
